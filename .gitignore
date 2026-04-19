@@ -62,3 +62,7 @@ htmlcov/
 
 # Local config
 *.local
+
+# Devolping Files
+
+REQUIREMENTS.md
