@@ -1,10 +1,10 @@
 """Mai CLI - Daily summary module.
 
-v1.2.0
 """
 
 import json
 import fcntl
+from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, Any, List, Optional
@@ -13,6 +13,22 @@ from .config import (
     get_mai_dir, get_daily_order, GLOBAL,
 )
 from .sync import sync_to_async
+
+
+# ─────────────────────────────────────────────
+# Structured Return Type
+# ─────────────────────────────────────────────
+
+@dataclass
+class DailySummaryResult:
+    """统一返回值类型，所有分支返回同类对象。"""
+    date: str                       # 哪一天的日报
+    summaries: Dict[str, str]       # agent -> content
+    is_all: bool                   # 是否为 --all 汇总模式
+
+    def get(self, agent: str) -> str:
+        """获取指定 agent 的内容，不存在返回空字符串。"""
+        return self.summaries.get(agent, "")
 
 
 # ─────────────────────────────────────────────
@@ -71,48 +87,51 @@ def daily_summary_trigger(project_root: Path):
     out("✅ 每日汇报事件已触发，请各 Agent 于今日提交日报", command="daily-summary trigger", **data)
 
 
-def daily_summary_read(project_root: Path, agent: Optional[str] = None, read_all: bool = False):
-    """REQ-002-2 & REQ-002-3: Read agent diary or all summaries."""
-    from .mai import out, out_json
+def daily_summary_read(project_root: Path, agent: Optional[str] = None, read_all: bool = False) -> DailySummaryResult:
+    """REQ-002-2 & REQ-002-3: 统一返回 DailySummaryResult。"""
+    from .mai import out, out_json, err
     mai = get_mai_dir(project_root)
     today = datetime.now().strftime("%Y-%m-%d")
     summary_dir = mai / "history" / f"daily-{today}"
     order = get_daily_order(project_root)
 
     if read_all:
-        # Collect and finish event
+        # 直接透传 collect 的结果（已是 DailySummaryResult，is_all=True）
         return daily_summary_collect(project_root)
 
     if agent == "." or agent is None:
-        # Read all current progress without finishing
-        results = {}
+        # 读取所有当前进度（不触发结束）
+        summaries: Dict[str, str] = {}
         for a in order:
             sf = summary_dir / f"{a}.md"
-            results[a] = sf.read_text("utf-8", errors="replace") if sf.exists() else ""
-        
+            summaries[a] = sf.read_text("utf-8", errors="replace") if sf.exists() else ""
+
+        result = DailySummaryResult(date=today, summaries=summaries, is_all=False)
         if GLOBAL.format == "json":
-            out_json({"ok": True, "summaries": results})
+            out_json({"ok": True, "date": today, "summaries": summaries})
         else:
             lines = [f"=== Daily Progress - {today} ==="]
             for a in order:
-                content = results.get(a, "").strip()
+                content = summaries.get(a, "").strip()
                 lines.append(f"\n## {a.title()}")
                 lines.append(content if content else "(no summary)")
             out("\n".join(lines))
-        return
+        return result
 
-    # Read specific agent
+    # 读取指定 agent
     if agent not in order:
-        from .mai import err
         err(f"Unknown agent: {agent}. Valid: {order}", 1, error="INVALID_AGENT")
 
     sf = summary_dir / f"{agent}.md"
     content = sf.read_text("utf-8", errors="replace") if sf.exists() else ""
-    
+    summaries = {agent: content}
+
+    result = DailySummaryResult(date=today, summaries=summaries, is_all=False)
     if GLOBAL.format == "json":
-        out_json({"ok": True, "agent": agent, "content": content})
+        out_json({"ok": True, "date": today, "agent": agent, "content": content})
     else:
-        print(content)
+        out(content)
+    return result
 
 
 def daily_summary_write(project_root: Path, agent: str, content: str):
@@ -158,9 +177,10 @@ def daily_summary_write(project_root: Path, agent: str, content: str):
     out(f"Daily summary written for {agent}.", command="daily-summary write", agent=agent)
 
 
-def daily_summary_collect(project_root: Path):
+def daily_summary_collect(project_root: Path) -> DailySummaryResult:
     """
-    REQ-002-3: Summarize all agent summaries and generate a report.
+    REQ-002-3: 汇总所有 agent 日报，生成报告文件。
+    返回 DailySummaryResult，与 daily_summary_read 保持类型一致。
     """
     from .mai import out, out_json, GLOBAL
     mai = get_mai_dir(project_root)
@@ -168,10 +188,10 @@ def daily_summary_collect(project_root: Path):
     summary_dir = mai / "history" / f"daily-{today}"
     order = get_daily_order(project_root)
 
-    results = {}
+    summaries: Dict[str, str] = {}
     for agent in order:
         sf = summary_dir / f"{agent}.md"
-        results[agent] = sf.read_text("utf-8", errors="replace") if sf.exists() else ""
+        summaries[agent] = sf.read_text("utf-8", errors="replace") if sf.exists() else ""
 
     reports_dir = project_root / "reports"
     reports_dir.mkdir(parents=True, exist_ok=True)
@@ -180,7 +200,7 @@ def daily_summary_collect(project_root: Path):
     if not GLOBAL.dry_run:
         lines = [f"# 每日协同汇总 - {today}\n"]
         for agent in order:
-            content = results.get(agent, "").strip()
+            content = summaries.get(agent, "").strip()
             lines.append(f"\n## {agent.title()}")
             lines.append(content if content else "（无摘要）")
         report_text = "\n".join(lines)
@@ -189,10 +209,12 @@ def daily_summary_collect(project_root: Path):
 
     if GLOBAL.format == "json":
         out_json({"ok": True, "command": "daily-summary read --all",
-                  "date": today, "summaries": results})
+                  "date": today, "summaries": summaries})
     else:
         lines = [f"=== Daily Summary Report - {today} ==="]
         for agent in order:
             lines.append(f"\n## {agent.title()}")
-            lines.append(results.get(agent, "") or "(no summary)")
+            lines.append(summaries.get(agent, "") or "(no summary)")
         out("\n".join(lines), command="daily-summary read --all")
+
+    return DailySummaryResult(date=today, summaries=summaries, is_all=True)
