@@ -4,6 +4,7 @@ v1.2.0
 """
 
 import json
+import fcntl
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, Any, List, Optional
@@ -19,6 +20,7 @@ from .sync import sync_to_async
 # ─────────────────────────────────────────────
 
 DAILY_EVENT_FILE = ".daily-summary-event"
+DAILY_LOCK_FILE  = ".daily-summary.lock"
 
 
 # ─────────────────────────────────────────────
@@ -114,35 +116,44 @@ def daily_summary_read(project_root: Path, agent: Optional[str] = None, read_all
 
 
 def daily_summary_write(project_root: Path, agent: str, content: str):
-    """REQ-002-2: Full overwrite, no more turn-based locking."""
+    """REQ-002-2: Write diary with flock protection."""
     from .mai import out, err
     order = get_daily_order(project_root)
     if agent not in order:
         err(f"Unknown agent: {agent}. Valid: {order}", 1, error="INVALID_AGENT")
 
-    event = _read_daily_event(project_root)
-    if not event.get("triggered_at"):
-        err("Daily summary not triggered today.", 1, error="NOT_TRIGGERED")
-        return
-
     mai = get_mai_dir(project_root)
-    today = datetime.now().strftime("%Y-%m-%d")
+    lock_file = mai / "events" / DAILY_LOCK_FILE
+    lock_file.parent.mkdir(parents=True, exist_ok=True)
 
-    if not GLOBAL.dry_run:
-        summary_dir = mai / "history" / f"daily-{today}"
-        summary_dir.mkdir(parents=True, exist_ok=True)
-        summary_file = summary_dir / f"{agent}.md"
-        summary_file.write_text(
-            f"# {agent.title()} Daily Summary - {today}\n\n{content}\n",
-            encoding="utf-8"
-        )
-        sync_to_async(summary_file, project_root)
+    with open(lock_file, "w") as f:
+        try:
+            fcntl.flock(f.fileno(), fcntl.LOCK_EX)
 
-        # REQ-002: If last agent, auto-finish the cycle
-        if order and agent == order[-1]:
-            event_file = mai / "events" / DAILY_EVENT_FILE
-            if event_file.exists():
-                event_file.unlink()
+            event = _read_daily_event(project_root)
+            if not event.get("triggered_at"):
+                err("Daily summary not triggered today.", 1, error="NOT_TRIGGERED")
+                return
+
+            today = datetime.now().strftime("%Y-%m-%d")
+
+            if not GLOBAL.dry_run:
+                summary_dir = mai / "history" / f"daily-{today}"
+                summary_dir.mkdir(parents=True, exist_ok=True)
+                summary_file = summary_dir / f"{agent}.md"
+                summary_file.write_text(
+                    f"# {agent.title()} Daily Summary - {today}\n\n{content}\n",
+                    encoding="utf-8"
+                )
+                sync_to_async(summary_file, project_root)
+
+                # REQ-002: If last agent, auto-finish the cycle
+                if order and agent == order[-1]:
+                    event_file = mai / "events" / DAILY_EVENT_FILE
+                    if event_file.exists():
+                        event_file.unlink()
+        finally:
+            fcntl.flock(f.fileno(), fcntl.LOCK_UN)
 
     out(f"Daily summary written for {agent}.", command="daily-summary write", agent=agent)
 
