@@ -1,6 +1,5 @@
 """Mai CLI - Issue list / show module.
 
-v1.1.0
 """
 
 from datetime import datetime, timedelta

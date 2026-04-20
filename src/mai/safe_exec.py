@@ -1,6 +1,5 @@
 """Mai CLI - Safe exec check module.
 
-v1.1.0
 """
 
 import re

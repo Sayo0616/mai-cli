@@ -1,6 +1,5 @@
 """Mai CLI - Lock protocol module.
 
-v1.1.0
 """
 
 import fcntl

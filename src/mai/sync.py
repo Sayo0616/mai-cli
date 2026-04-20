@@ -1,6 +1,5 @@
 """Mai CLI - Async mirror sync module.
 
-v1.1.0
 """
 
 import shutil

@@ -1,6 +1,5 @@
 """Mai CLI - Configuration module.
 
-v1.1.0
 """
 
 import json

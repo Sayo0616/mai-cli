@@ -1,6 +1,5 @@
 """Mai CLI - Escalation generation module.
 
-v1.1.0
 """
 
 from pathlib import Path

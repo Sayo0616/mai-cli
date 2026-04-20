@@ -1,6 +1,5 @@
 """Mai CLI - Issue commands module.
 
-v1.1.0
 """
 
 import os
