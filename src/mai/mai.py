@@ -1,6 +1,5 @@
 """Mai CLI - Main entry point with argument parsing and dispatch.
 
-v1.1.0
 """
 
 import argparse
@@ -8,6 +7,12 @@ import json
 import sys
 from pathlib import Path
 from typing import Optional
+from importlib.metadata import version, PackageNotFoundError
+
+try:
+    __version__ = version("mai-cli")
+except PackageNotFoundError:
+    __version__ = "1.3.0"
 
 from .config import (
     get_mai_dir, get_async_dir, find_project_root,
@@ -83,11 +88,16 @@ def ensure_mai_structure(project_root: Path):
 
 def build_parser():
     parser = argparse.ArgumentParser(prog="mai", description="Agent Collaboration CLI")
+    parser.add_argument("-v", "--version", action="version", version=f"mai {__version__}")
     parser.add_argument("--project", dest="project", default=None)
     parser.add_argument("--format", dest="format", choices=["json", "text"], default="text")
     parser.add_argument("--dry-run", dest="dry_run", action="store_true")
 
     sub = parser.add_subparsers(dest="subcommand", required=True)
+
+    # ── init (shortcut for project init) ──
+    init_sp = sub.add_parser("init", help="Initialize project")
+    init_sp.add_argument("project_name", nargs="?", default=".")
 
     # ── issue ──
     issue_sp = sub.add_parser("issue", help="Issue commands")
@@ -190,33 +200,36 @@ def dispatch(args):
     from .project import cmd_project_init
 
     project_root = None
-    if args.subcommand != "project" or args.proj_cmd != "init":
+    if args.subcommand not in ["project", "init"] or (args.subcommand == "project" and args.proj_cmd != "init"):
         project_root = find_project_root(args.project)
         if project_root is None:
-            err("Project not found. Set AGENTS_PROJECT/MAI_PROJECT or run 'mai project init'.",
+            err("Project not found. Set AGENTS_PROJECT/MAI_PROJECT or run 'mai init'.",
                 4, error="PROJECT_NOT_FOUND")
         mai_cfg = get_mai_dir(project_root) / "config.json"
         if not mai_cfg.exists():
-            err(f"Project not initialized. Run 'mai project init {project_root.name}'.",
+            err(f"Project not initialized. Run 'mai init {project_root.name}'.",
                 4, error="NOT_INITIALIZED")
 
     try:
         if args.subcommand == "issue":
-            dispatch_issue(args, project_root)
+            return dispatch_issue(args, project_root)
         elif args.subcommand == "queue":
-            dispatch_queue(args, project_root)
+            return dispatch_queue(args, project_root)
         elif args.subcommand == "lock":
-            dispatch_lock(args, project_root)
+            return dispatch_lock(args, project_root)
         elif args.subcommand == "log":
-            dispatch_log(args, project_root)
+            return dispatch_log(args, project_root)
         elif args.subcommand == "daily-summary":
-            dispatch_daily_summary(args, project_root)
+            return dispatch_daily_summary(args, project_root)
         elif args.subcommand == "escalation":
-            dispatch_escalation(args, project_root)
+            return dispatch_escalation(args, project_root)
         elif args.subcommand == "exec":
-            dispatch_exec(args, project_root)
+            return dispatch_exec(args, project_root)
         elif args.subcommand == "project":
-            dispatch_project(args)
+            return dispatch_project(args)
+        elif args.subcommand == "init":
+            from .project import cmd_project_init
+            return cmd_project_init(args.project_name)
     except Exception as e:
         err(str(e), 1, error="INTERNAL_ERROR")
 
@@ -228,45 +241,45 @@ def dispatch_issue(args, project_root):
     )
     from .issue_list import cmd_issue_list, cmd_issue_show
     if args.issue_cmd == "new":
-        cmd_issue_new(project_root, args.queue, args.title, args.ref)
+        return cmd_issue_new(project_root, args.queue, args.title, args.ref)
     elif args.issue_cmd == "amend":
-        cmd_issue_amend(project_root, args.issue_id, args.remark)
+        return cmd_issue_amend(project_root, args.issue_id, args.remark)
     elif args.issue_cmd == "claim":
-        cmd_issue_claim(project_root, args.issue_id)
+        return cmd_issue_claim(project_root, args.issue_id)
     elif args.issue_cmd == "complete":
-        cmd_issue_complete(project_root, args.issue_id, args.conclusion)
+        return cmd_issue_complete(project_root, args.issue_id, args.conclusion)
     elif args.issue_cmd == "list":
-        cmd_issue_list(project_root, args.queue)
+        return cmd_issue_list(project_root, args.queue)
     elif args.issue_cmd == "show":
-        cmd_issue_show(project_root, args.issue_id)
+        return cmd_issue_show(project_root, args.issue_id)
     elif args.issue_cmd == "escalate":
-        cmd_issue_escalate(project_root, args.issue_id)
+        return cmd_issue_escalate(project_root, args.issue_id)
 
 
 def dispatch_queue(args, project_root):
     from .queue import cmd_queue_check, cmd_queue_blockers
     if args.queue_cmd == "check":
-        cmd_queue_check(project_root, args.queue, args.overdue)
+        return cmd_queue_check(project_root, args.queue, args.overdue)
     elif args.queue_cmd == "blockers":
-        cmd_queue_blockers(project_root)
+        return cmd_queue_blockers(project_root)
 
 
 def dispatch_lock(args, project_root):
     from .lock import cmd_lock_check, cmd_lock_force_release, cmd_lock_guardian
     if args.lock_cmd == "check":
-        cmd_lock_check(project_root, args.issue_id)
+        return cmd_lock_check(project_root, args.issue_id)
     elif args.lock_cmd == "force-release":
-        cmd_lock_force_release(project_root, args.issue_id)
+        return cmd_lock_force_release(project_root, args.issue_id)
     elif args.lock_cmd == "guardian":
-        cmd_lock_guardian(project_root)
+        return cmd_lock_guardian(project_root)
 
 
 def dispatch_log(args, project_root):
     from .log import cmd_log_history, cmd_log_write
     if args.log_cmd == "history":
-        cmd_log_history(project_root, args.date, args.agent)
+        return cmd_log_history(project_root, args.date, args.agent)
     elif args.log_cmd == "write":
-        cmd_log_write(project_root, args.agent, args.type, args.summary, args.status)
+        return cmd_log_write(project_root, args.agent, args.type, args.summary, args.status)
 
 
 def dispatch_daily_summary(args, project_root):
@@ -274,18 +287,18 @@ def dispatch_daily_summary(args, project_root):
         daily_summary_trigger, daily_summary_write, daily_summary_read,
     )
     if args.ds_cmd == "trigger":
-        daily_summary_trigger(project_root)
+        return daily_summary_trigger(project_root)
     elif args.ds_cmd == "write":
         content = " ".join(args.content) if args.content else ""
-        daily_summary_write(project_root, args.agent, content)
+        return daily_summary_write(project_root, args.agent, content)
     elif args.ds_cmd == "read":
-        daily_summary_read(project_root, args.target, args.read_all)
+        return daily_summary_read(project_root, args.target, args.read_all)
 
 
 def dispatch_escalation(args, project_root):
     from .escalation import cmd_escalation_gen
     if args.esc_cmd == "gen":
-        cmd_escalation_gen(project_root, args.issue_id)
+        return cmd_escalation_gen(project_root, args.issue_id)
 
 
 def dispatch_exec(args, project_root):
@@ -300,12 +313,13 @@ def dispatch_exec(args, project_root):
                 command="exec safe-check", safe=safe)
         if not safe:
             sys.exit(2)
+        return safe
 
 
 def dispatch_project(args):
     from .project import cmd_project_init
     if args.proj_cmd == "init":
-        cmd_project_init(args.project_name)
+        return cmd_project_init(args.project_name)
 
 
 # ─────────────────────────────────────────────

@@ -1,6 +1,5 @@
 """Mai CLI - Project init module.
 
-v1.1.0
 """
 
 from datetime import datetime
@@ -35,15 +34,18 @@ def ensure_mai_structure(project_root: Path):
 
 def cmd_project_init(project_name: str):
     """Initialize a new project with Mai directory structure."""
-    project_root = find_project_root(project_name)
-    if project_root is None:
-        projects_dir = Path.home() / ".openclaw" / "workspace" / "projects" / project_name
-        if not GLOBAL.dry_run:
-            projects_dir.mkdir(parents=True, exist_ok=True)
-            (projects_dir / "AGENTS.md").write_text(
-                f"# {project_name}\n\n协作项目于 {datetime.now().isoformat()} 初始化。\n"
-            )
-        project_root = projects_dir
+    if project_name == ".":
+        project_root = Path.cwd()
+    else:
+        project_root = find_project_root(project_name)
+        if project_root is None:
+            projects_dir = Path.home() / ".openclaw" / "workspace" / "projects" / project_name
+            if not GLOBAL.dry_run:
+                projects_dir.mkdir(parents=True, exist_ok=True)
+                (projects_dir / "AGENTS.md").write_text(
+                    f"# {project_name}\n\n协作项目于 {datetime.now().isoformat()} 初始化。\n"
+                )
+            project_root = projects_dir
 
     ensure_mai_structure(project_root)
 
@@ -51,12 +53,12 @@ def cmd_project_init(project_name: str):
 
     if base_config.get("initialized_at"):
         from .mai import out
-        out(f"Project '{project_name}' already initialized.", command="project init", idempotent=True)
+        out(f"Project '{project_root.name}' already initialized.", command="project init", idempotent=True)
         return
 
     if not GLOBAL.dry_run:
         new_config = dict(base_config)
-        new_config["name"] = project_name
+        new_config["name"] = project_root.name
         new_config["initialized_at"] = datetime.now().isoformat()
         new_config["queues"] = DEFAULT_QUEUES
         new_config["agents"] = DEFAULT_AGENTS
@@ -67,4 +69,4 @@ def cmd_project_init(project_name: str):
         sync_to_async(cfg_file, project_root)
 
     from .mai import out
-    out(f"Project '{project_name}' initialized at {project_root}.", command="project init")
+    out(f"Project '{project_root.name}' initialized at {project_root}.", command="project init")
