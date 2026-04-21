@@ -42,10 +42,10 @@
 ### 步骤 1.1：初始化 mai-cli 项目
 
 ```bash
-mai init <PROJECT_NAME>
+mai init [<PROJECT_NAME>]
 ```
 
-> 注意：这里传入的是**项目名称**，而非完整路径。mai-cli 会在 `~/.openclaw/workspace/projects/<PROJECT_NAME>/` 下创建项目目录。
+> 注意：这里传入的是**项目名称**，而非完整路径。mai-cli 会在 `~/.openclaw/workspace/projects/<PROJECT_NAME>/` 下创建项目目录。不传则在当前目录初始化mai。
 
 ### 步骤 1.2：注册团队成员
 
@@ -175,7 +175,8 @@ Skill 触发条件：Agent 被要求创建/认领/完成 issue、查看队列、
 
 #### 3.1.3 配置锁监护 cron
 
-`lock guardian` 是长时间运行的守护进程，建议通过 cron 定期触发一个检查-退出的一-shot 命令，或在独立进程中持续运行。
+`lock guardian` 是长时间运行的守护进程，建议通过 cron 定期触发一个检查-退出的一-shot 命令，或在独立进程中持续运行。  
+路径 `.openclaw/cron/jobs.json`
 
 **OpenClaw cron 格式（每 `<LOCK_INTERVAL>` 分钟触发）：**
 
