@@ -229,6 +229,7 @@ def build_parser():
     proj_sp = sub.add_parser("project")
     pr = proj_sp.add_subparsers(dest="proj_cmd", required=True)
     p = pr.add_parser("init")
+    p.add_argument("name", nargs="?", default=".", help="Project name or path (optional, default '.')")
 
     # ── agent ──
     agent_sp = sub.add_parser("agent")
@@ -363,7 +364,8 @@ def dispatch(args):
         elif args.subcommand == "exec":
             dispatch_exec(args, project_root)
         elif args.subcommand == "project":
-            cmd_project_init(project_root)
+            if args.proj_cmd == "init":
+                cmd_project_init(args.name)
         elif args.subcommand == "init":
             cmd_project_init(Path.cwd())
         elif args.subcommand == "agent":
