@@ -15,7 +15,7 @@ from importlib.metadata import version, PackageNotFoundError
 try:
     __version__ = version("mai-cli")
 except PackageNotFoundError:
-    __version__ = "1.6.1"
+    __version__ = "1.6.2"
 
 from .config import (
     get_mai_dir, get_async_dir, find_project_root,
@@ -259,6 +259,7 @@ def cmd_status(project_root: Path, verbose: bool = False):
     # 1. Queues
     out("Queues:")
     queue_sla = get_queue_sla(project_root)
+    status_emoji = get_status_emoji(project_root)
     for q in queue_sla:
         issues = list_issues_in_queue(project_root, q)
         counts = {"open": 0, "in_progress": 0, "blocked": 0, "completed": 0}
@@ -272,7 +273,7 @@ def cmd_status(project_root: Path, verbose: bool = False):
         out(f"  {q:15} OPEN: {counts['open']:<3} IN_PROGRESS: {counts['in_progress']:<3} BLOCKED: {counts['blocked']:<3}")
         if verbose and issues:
             for iss in issues:
-                st_icon = {"open": "⭕", "in_progress": "🔄", "blocked": "🚫", "completed": "✅"}.get(iss.get("status", "open").lower(), "❓")
+                st_icon = status_emoji.get(iss.get("status", "open").lower(), "❓")
                 out(f"    {st_icon} {iss['id']:8} {iss.get('title', 'No Title')}")
 
     # 2. Locks

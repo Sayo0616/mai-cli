@@ -285,3 +285,4 @@ def test_dispatch_project_init_unknown_project(capsys):
     except SystemExit:
         pass
     GLOBAL.format = old
+    GLOBAL.dry_run = False

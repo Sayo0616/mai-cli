@@ -127,9 +127,14 @@ def daily_summary_read(project_root: Path, agent: Optional[str] = None, read_all
     return result
 
 
-def daily_summary_write(project_root: Path, agent: str, content: str):
+def daily_summary_write(project_root: Path, agent: str, content: Any):
     """REQ-002-2 & REQ-011: Write diary with turn checking and status updates."""
     from .mai import out, err, suggest
+    
+    # Handle list of tokens from CLI (REQ-002: Ensure list joined by spaces)
+    if isinstance(content, list):
+        content = " ".join(content)
+    
     status = _read_status(project_root)
     if not status.get("triggered_at"):
         err("Daily summary not triggered today.", 1, error="NOT_TRIGGERED", hint="Run 'mai daily-summary trigger' to start today's round.")

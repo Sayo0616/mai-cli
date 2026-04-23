@@ -38,12 +38,13 @@ DEFAULT_AGENTS = {
 DEFAULT_DAILY_ORDER = []
 
 DEFAULT_EMOJI = {
-    "open":       "🔓",
-    "claimed":    "🔄",
-    "complete":   "✅",
-    "escalated":  "⚠️",
-    "blocked":    "⚠️",
-    "overdue":    "⏱️",
+    "open":          "⭕",
+    "in_progress":   "🔄",
+    "completed":     "✅",
+    "blocked":       "🚫",
+    "amended":       "📝",
+    "escalated":     "⚠️",
+    "overdue":       "⏱️",
 }
 
 # Deprecated: use DEFAULT_DAILY_ORDER

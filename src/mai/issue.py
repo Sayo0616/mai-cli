@@ -52,7 +52,11 @@ def make_issue_content(
 ) -> str:
     """Build a spec-compliant issue markdown file."""
     now = datetime.now().isoformat()
-    emoji = get_status_emoji(project_root).get(status.lower(), "🔓") if project_root else "🔓"
+    from .config import DEFAULT_EMOJI
+    if project_root:
+        emoji = get_status_emoji(project_root).get(status.lower(), "❓")
+    else:
+        emoji = DEFAULT_EMOJI.get(status.lower(), "❓")
 
     owner_sla, sla_hours = "", None
     if project_root:
@@ -154,8 +158,9 @@ def parse_issue_file(path: Path) -> Dict[str, Any]:
             if key in key_map:
                 data[key_map[key]] = val
             if key == "状态":
-                # Extract text after emoji
-                data["status"] = re.sub(r"^[^\s]+\s*", "", val).strip()
+                # Extract text after emoji if present. E.g. "⭕ OPEN" -> "OPEN"
+                parts = val.split(maxsplit=1)
+                data["status"] = parts[1] if len(parts) > 1 else parts[0]
 
     sections = {}
     current = None

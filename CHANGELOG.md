@@ -1,5 +1,21 @@
 # Changelog
 
+## v1.6.2 (2026-04-23)
+- **Bug 修复** — 修复了 `issue.py` 中 `make_issue_content` 在未提供 `project_root` 时无法正确获取默认图标的问题。
+- **测试增强** — 修复了测试套件中的 `GLOBAL.dry_run` 状态泄漏问题，并新增了图标与摘要写入的专项验证。
+- **图标展示增强** — `mai status` 移除硬编码图标，完全由配置驱动；`issue list` 优化了图标 Fallback 逻辑（使用 ❓）。
+
+## v1.6.1 (2026-04-23)
+- **Bug 修复** — 修复了 `daily-summary write` 在接收命令行多个单词作为内容时，误将其写为 Python 列表字符串表示的问题。
+- **状态解析优化** — 修复了 `issue.py` 在解析不带图标的状态字段时的正则 Bug，增强了手动编辑后的兼容性。
+
+## v1.6.0 (2026-04-23)
+- **REQ-001: 发起方与处理方分离** — Issue 结构新增 `creator` 字段，支持跨 Agent 协作追踪。
+- **REQ-003: 简化队列命名** — `mai agent add` 创建的默认队列名不再包含 `-tasks` 后缀，直接与 Agent 名一致。
+- **REQ-004: 并发每日摘要** — 废除摘要写入的强制顺序，改为基于状态表的独立写入模式，大幅提升协作灵活性。
+- **REQ-002: 可视化监控增强** — `mai issue list` 新增状态图标、实时锁持有者显示；支持 SLA 超时 (⏱️) 动态叠加提示。
+- **自定义配置** — `config.json` 新增 `issue_status_emoji` 字段，支持自定义所有状态展示图标。
+
 ## v1.5.0 (2026-04-21)
 - **REQ-009: 自动项目探测** — 移除 `--project` 强制要求，默认从当前目录向上递归搜索 `.mai/config.json`；支持 `MAI_PROJECT` 环境变量优先级最高。
 - **REQ-013: Dry-run 漏洞修复** — `acquire_lock` 和 `release_lock` 在 `--dry-run` 模式下完全不产生任何文件。

@@ -37,7 +37,7 @@ def list_issues_in_queue(project_root: Path, queue: str,
             "timestamp": li["timestamp"] if li else None
         }
 
-        data["status_emoji"] = status_emoji.get(data["status"], "🔓")
+        data["status_emoji"] = status_emoji.get(data["status"].lower(), "❓")
 
         deadline_str = data.get("sla_deadline")
         data["sla_expired"] = False
@@ -46,6 +46,9 @@ def list_issues_in_queue(project_root: Path, queue: str,
                 dl = datetime.fromisoformat(deadline_str)
                 if dl < datetime.now():
                     data["sla_expired"] = True
+                    # Append overdue icon if available
+                    if "overdue" in status_emoji and data["status"].lower() != "completed":
+                        data["status_emoji"] += status_emoji["overdue"]
             except Exception:
                 pass
         elif queue in queue_sla:
@@ -59,6 +62,8 @@ def list_issues_in_queue(project_root: Path, queue: str,
                     data["sla_deadline"] = dl.isoformat()
                     if dl < datetime.now():
                         data["sla_expired"] = True
+                        if "overdue" in status_emoji and data["status"].lower() != "completed":
+                            data["status_emoji"] += status_emoji["overdue"]
                 except Exception:
                     pass
 
@@ -109,7 +114,7 @@ def cmd_issue_list(project_root: Path, queue: Optional[str]):
             if not issues:
                 out("  (empty)")
             for iss in issues:
-                emoji = iss.get("status_emoji", "🔓")
+                emoji = iss.get("status_emoji", "❓")
                 lock_icon = "🔄" if iss["lock"]["held"] else "🔓"
                 lock_info = f" [{lock_icon} {iss['lock']['holder'] or '(无)'}]"
                 expired = " ⚠️已过期" if iss["sla_expired"] else ""
