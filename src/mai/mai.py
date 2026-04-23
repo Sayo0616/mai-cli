@@ -15,7 +15,7 @@ from importlib.metadata import version, PackageNotFoundError
 try:
     __version__ = version("mai-cli")
 except PackageNotFoundError:
-    __version__ = "1.6.3"
+    __version__ = "1.6.4"
 
 from .config import (
     get_mai_dir, get_async_dir, find_project_root,
@@ -140,6 +140,7 @@ def build_parser():
     p = iss.add_parser("new", help="Create new issue")
     p.add_argument("queue"); p.add_argument("title")
     p.add_argument("--ref", default=None)
+    p.add_argument("--creator", default=None, help="Override the issue creator (default: current agent)")
 
     p = iss.add_parser("amend", help="Amend issue")
     p.add_argument("issue_id"); p.add_argument("remark", nargs="?", default="")
@@ -299,15 +300,12 @@ def cmd_status(project_root: Path, verbose: bool = False):
         out(f"\nDaily Summary ({date}):")
         participants = status.get("participants", [])
         agent_status = status.get("status", {})
-        next_up = None
         for p in participants:
             s = agent_status.get(p, "pending")
             icon = "✓" if s == "written" else "⏳"
             out(f"  {p:12}: {icon} {s}")
-            if s == "pending" and next_up is None:
-                next_up = p
-        if next_up:
-            out(f"  Next up: {next_up}")
+        if all(s == "written" for s in agent_status.values()):
+            out("  All summaries complete for today!")
     else:
         out("\nDaily Summary: Not triggered today.")
 
@@ -384,7 +382,7 @@ def dispatch_issue(args, project_root):
     )
     from .issue_list import cmd_issue_list, cmd_issue_show
     if args.issue_cmd == "new":
-        cmd_issue_new(project_root, args.queue, args.title, args.ref)
+        cmd_issue_new(project_root, args.queue, args.title, args.ref, getattr(args, "creator", None))
     elif args.issue_cmd == "amend":
         cmd_issue_amend(project_root, args.issue_id, args.remark)
     elif args.issue_cmd == "claim":

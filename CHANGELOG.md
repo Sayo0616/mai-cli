@@ -1,5 +1,10 @@
 # Changelog
 
+## v1.6.4 (2026-04-23)
+- **REQ: 指定发起方** — `issue new` 新增 `--creator` 参数，允许显式指定 Issue 发起者身份（默认回退至当前 Agent 环境变量）。
+- **UI: 状态展示优化** — 移除 `mai status` 和 `mai daily-summary status` 中过时的 "Next up" 逻辑，适配并发独立写入模型。
+- **稳定性** — 为 `issue new` 覆盖逻辑新增单元测试。
+
 ## v1.6.3 (2026-04-23)
 - **Bug 修复** — 修复了 `mai.py` 中 `cmd_status` 命令因缺少 `get_status_emoji` 导入而导致的运行时 `NameError`。
 - **稳定性增强** — 为 `cmd_status` 添加了冒烟测试，确保全局状态视图的长期稳定性。

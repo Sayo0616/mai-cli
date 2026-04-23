@@ -205,19 +205,13 @@ def daily_summary_status(project_root: Path):
         return
 
     out(f"Daily Summary Status ({date}):")
-    next_up = None
     for p in participants:
         s = agent_status.get(p, "pending")
         icon = "✓" if s == "written" else "⏳"
         out(f"  {p:12}: {icon} {s}")
-        if s == "pending" and next_up is None:
-            next_up = p
-    
-    if next_up:
-        out(f"\nNext up: {next_up}")
-    else:
-        out("\nAll summaries complete for today!")
 
+    if all(s == "written" for s in agent_status.values()):
+        out("\nAll summaries complete for today!")
 
 def daily_summary_reset(project_root: Path):
     """REQ-011: Reset today's round by deleting status.json."""

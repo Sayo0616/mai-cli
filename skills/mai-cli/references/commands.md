@@ -6,7 +6,7 @@
 
 | 命令 | 说明 |
 |------|------|
-| `issue new <queue> <title> [--ref <ref-id>]` | 新建 issue 到指定队列 |
+| `issue new <queue> <title> [--ref <id>] [--creator <name>]` | 新建 issue 到指定队列 |
 | `issue claim <issue-id>` | 认领 issue（加 flock 锁），状态 → IN_PROGRESS |
 | `issue block <issue-id> <reason>` | 标记 issue 为 BLOCKED（记录原因） |
 | `issue unblock <issue-id>` | 解除 BLOCKED，恢复为 IN_PROGRESS |

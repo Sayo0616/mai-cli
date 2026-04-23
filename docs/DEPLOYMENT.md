@@ -288,7 +288,7 @@ mai --project <SHARED_WORKSPACE_PATH> daily-summary write <AGENT_NAME> "验证�
 
 ```bash
 mai --project <SHARED_WORKSPACE_PATH> issue new \
-  <HANDLER_A>-questions "部署验证测试" --ref TEST-001
+  <HANDLER_A> "部署验证测试" --ref TEST-001 --creator "deployer"
 ```
 
 ### 步骤 4.2:验证认领与完成

@@ -245,7 +245,7 @@ def _update_issue_file(project_root: Path, data: Dict[str, Any], status: str, re
 # Issue Commands
 # ─────────────────────────────────────────────
 
-def cmd_issue_new(project_root: Path, queue: str, title: str, ref: Optional[str]):
+def cmd_issue_new(project_root: Path, queue: str, title: str, ref: Optional[str], creator: Optional[str] = None):
     from .mai import out, err, ensure_mai_structure, suggest
     queue_sla = get_queue_sla(project_root)
     if queue not in queue_sla:
@@ -255,7 +255,7 @@ def cmd_issue_new(project_root: Path, queue: str, title: str, ref: Optional[str]
     ensure_mai_structure(project_root)
     issue_id = next_issue_id(project_root, queue)
     owner, _ = queue_sla[queue]
-    agent = os.environ.get("MAI_AGENT", os.environ.get("AGENT_NAME", "unknown"))
+    agent = creator or os.environ.get("MAI_AGENT", os.environ.get("AGENT_NAME", "unknown"))
 
     content = make_issue_content(
         issue_id=issue_id,

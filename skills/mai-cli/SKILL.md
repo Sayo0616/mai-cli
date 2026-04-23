@@ -15,7 +15,7 @@ mai-cli 通过 flock 原子锁和队列路由协调多 Agent 工作流。
 
 ```
 # 1. 新建 issue（指定队列）
-mai --project <path> issue new <queue> <title> [--ref <ref-id>]
+mai --project <path> issue new <queue> <title> [--ref <ref-id>] [--creator <name>]
 
 # 2. 认领 issue（加 flock 锁，状态 → IN_PROGRESS）
 mai --project <path> issue claim <issue-id>
