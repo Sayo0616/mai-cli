@@ -122,13 +122,25 @@ def test_parse_issue_file():
 def test_next_issue_id():
     from mai.issue import next_issue_id
     import tempfile
+    import re
     with tempfile.TemporaryDirectory() as tmpdir:
         root = Path(tmpdir)
+        # Create .mai/config.json to ensure we have prefixes
+        mai_hidden = root / ".mai"
+        mai_hidden.mkdir()
+        (mai_hidden / "config.json").write_text('{"queues": {"questions": {"id_prefix": "REQ", "handler": "default", "sla_minutes": 60}}}')
+        
         mai_dir = root / ".mai" / "queues" / "questions"
         mai_dir.mkdir(parents=True)
         (mai_dir / "REQ-001.md").write_text("# [REQ-001] First\n")
         (mai_dir / "REQ-002.md").write_text("# [REQ-002] Second\n")
-        assert next_issue_id(root, "questions") == "REQ-003"
+        
+        new_id = next_issue_id(root, "questions")
+        # Check format: PREFIX-HASH (6 chars hex)
+        assert re.match(r"^REQ-[0-9A-F]{6}$", new_id)
+        # Ensure it doesn't collide with existing ones
+        assert new_id != "REQ-001"
+        assert new_id != "REQ-002"
 
 
 def test_read_issue_not_found():
