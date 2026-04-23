@@ -15,11 +15,12 @@ from importlib.metadata import version, PackageNotFoundError
 try:
     __version__ = version("mai-cli")
 except PackageNotFoundError:
-    __version__ = "1.6.2"
+    __version__ = "1.6.3"
 
 from .config import (
     get_mai_dir, get_async_dir, find_project_root,
     load_config, GLOBAL, DAILY_SUMMARY_ORDER,
+    get_status_emoji,
 )
 from .sync import sync_to_async
 from .log import write_history, read_history

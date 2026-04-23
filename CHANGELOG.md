@@ -1,5 +1,9 @@
 # Changelog
 
+## v1.6.3 (2026-04-23)
+- **Bug 修复** — 修复了 `mai.py` 中 `cmd_status` 命令因缺少 `get_status_emoji` 导入而导致的运行时 `NameError`。
+- **稳定性增强** — 为 `cmd_status` 添加了冒烟测试，确保全局状态视图的长期稳定性。
+
 ## v1.6.2 (2026-04-23)
 - **Bug 修复** — 修复了 `issue.py` 中 `make_issue_content` 在未提供 `project_root` 时无法正确获取默认图标的问题。
 - **测试增强** — 修复了测试套件中的 `GLOBAL.dry_run` 状态泄漏问题，并新增了图标与摘要写入的专项验证。
