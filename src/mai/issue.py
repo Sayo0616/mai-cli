@@ -4,6 +4,7 @@
 
 import os
 import re
+import uuid
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Optional, List, Dict, Any
@@ -25,12 +26,19 @@ def next_issue_id(project_root: Path, queue: str) -> str:
     prefix = get_queue_id_prefix(project_root).get(queue, "REQ")
     queue_dir = get_mai_dir(project_root) / "queues" / queue
     queue_dir.mkdir(parents=True, exist_ok=True)
-    max_num = 0
-    for f in queue_dir.glob("*.md"):
-        m = re.match(rf"^{prefix}-(\d+)\.md$", f.name)
-        if m:
-            max_num = max(max_num, int(m.group(1)))
-    return f"{prefix}-{max_num + 1:03d}"
+    
+    while True:
+        short_hash = uuid.uuid4().hex[:6].upper()
+        candidate_id = f"{prefix}-{short_hash}"
+        # Ensure ID is globally unique across all queues
+        exists = False
+        queue_base = get_mai_dir(project_root) / "queues"
+        for q_dir in queue_base.iterdir():
+            if q_dir.is_dir() and (q_dir / f"{candidate_id}.md").exists():
+                exists = True
+                break
+        if not exists:
+            return candidate_id
 
 
 # ─────────────────────────────────────────────

@@ -1,5 +1,10 @@
 # Changelog
 
+## v1.7.1 (2026-04-23)
+- **ID: 全局唯一哈希 ID** — 重构 Issue ID 生成逻辑，从递增序列升级为 `[Prefix]-[6位随机哈希]`（如 `REQ-94064B`）。新增全局冲突检测，遍历所有队列目录确保 ID 绝对唯一。
+- **UX: Handler 参数归一化** — 官方推荐使用不带 `@` 前缀的 Agent 名称作为 `--handler` 参数。同步更新了 README、DEPLOYMENT 和 SKILL 文档示例，并移除了文档中关于“自动剥离 @”的过时描述（代码仍保持兼容）。
+- **DOC: 心跳流程标准化** — 重写了 `DEPLOYMENT.md` 中的 `HEARTBEAT.md` 配置示例，将其拆分为“处理人流程 (Handler Flow)”和“发起人验收 (Creator Flow)”，降低 Agent 学习成本。
+
 ## v1.7.0 (2026-04-23)
 - **REQ: 多步协作流转 (Multistage Flow)** — 新增 `issue transfer`, `issue submit-to-creator`, `issue confirm`, `issue reject` 四大命令，支持从“创建人 → 处理人 A → 处理人 B → 创建人确认”的完整闭环流程。
 - **SEC: 锁所有权校验** — 在执行转交、提交、完成、确认等敏感操作前，强制校验当前 Agent 是否持有该 Issue 的 flock 锁，防止越权操作，并保障状态流转的一致性。
