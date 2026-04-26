@@ -18,6 +18,79 @@ from .lock import acquire_lock, release_lock, check_lock
 from .log import write_history
 
 
+def check_permission(project_root: Path, operator: str, action: str, issue: Optional[Dict[str, Any]] = None):
+    """REQ-B: Core Permission Matrix check."""
+    from .config import get_roots, get_queue_sla
+    roots = get_roots(project_root)
+    if operator in roots:
+        return True
+
+    # Get roles
+    is_owner = False
+    is_handler = False
+
+    if issue:
+        queue = issue.get("queue")
+        queue_sla = get_queue_sla(project_root)
+        q_owner, _ = queue_sla.get(queue, (None, None))
+        if q_owner and operator == q_owner:
+            is_owner = True
+        
+        # handler is the current owner of the issue (who claimed it)
+        if issue.get("owner") == operator:
+            is_handler = True
+        
+        # Backward compatibility for 'creator' if still using v1.8 concepts
+        if not is_owner and issue.get("creator") == operator:
+            # In v1.9.0 REQ-D, creator is merged to owner, but for now we might still need this check
+            # or treat creator as owner for legacy issues.
+            is_owner = True
+
+    # Permission Matrix
+    # read is always True (handled by caller not calling check_permission for read)
+    
+    if action == "create":
+        # Check if operator is root or queue owner
+        from .config import get_queue_sla
+        queue_sla = get_queue_sla(project_root)
+        q_owner, _ = queue_sla.get(issue.get("queue") if issue else "", (None, None))
+        return operator == q_owner
+
+    if action == "claim":
+        # REQ-B says root, owner, handler can claim.
+        # Handler here likely means any registered agent who can perform work, 
+        # but since we don't have a 'handler' list, we might just allow all known agents 
+        # OR just root and owner for now if we want to be strict.
+        # Actually, let's allow all registered agents to claim for now, 
+        # but REQ-B specifically says 'handler ✅'.
+        # If we treat 'handler' as 'any agent registered in config.json', let's check that.
+        from .config import get_config
+        cfg = get_config(project_root)
+        is_registered_agent = operator in cfg.get("agents", {})
+        return is_owner or is_registered_agent
+
+    if action == "complete":
+        return is_owner
+    
+    if action in ["block", "unblock"]:
+        return is_owner or is_handler
+    
+    if action in ["transfer", "amend", "reopen", "escalate"]:
+        return is_owner
+
+    if action in ["confirm", "reject"]:
+        # REQ-E says root and owner
+        return is_owner
+
+    return False
+
+
+def _check_permission_or_err(project_root: Path, operator: str, action: str, issue: Optional[Dict[str, Any]] = None):
+    from .mai import err
+    if not check_permission(project_root, operator, action, issue):
+        err(f"权限不足：用户 '{operator}' 无权执行 '{action}' 操作。", 3, error="PERMISSION_DENIED")
+
+
 # ─────────────────────────────────────────────
 # Issue ID Generation
 # ─────────────────────────────────────────────
@@ -56,10 +129,10 @@ def make_issue_content(
     timeline: Optional[List[str]] = None,
     escalated_blocker_id: str = "",
     project_root: Optional[Path] = None,
-    creator: str = "",
     priority: str = "P2",
+    operator: str = "unknown",
 ) -> str:
-    """Build a spec-compliant issue markdown file."""
+    """Build a spec-compliant issue markdown file (v1.9.0)."""
     now = datetime.now().isoformat()
     from .config import DEFAULT_EMOJI
     if project_root:
@@ -81,12 +154,10 @@ def make_issue_content(
         sla_deadline = sla_dt.isoformat()
 
     owner_field = owner or owner_sla
-    creator_field = creator or owner_field
 
     lines = [
         f"# [{issue_id}] {title}",
         "",
-        f"**发起方：** @{creator_field}",
         f"**处理方：** @{owner_field}",
         f"**优先级：** {priority_field}",
         f"**创建时间：** {now}",
@@ -109,7 +180,7 @@ def make_issue_content(
     timeline = timeline or []
     # Add initial creation entry if timeline is empty
     if not timeline:
-        timeline.append(f"[{now}] @{creator_field}: 创建")
+        timeline.append(f"[{now}] @{operator}: 创建")
 
     for entry in timeline:
         if entry.startswith("- "):
@@ -182,6 +253,17 @@ def parse_issue_file(path: Path) -> Dict[str, Any]:
                 parts = val.split(maxsplit=1)
                 data["priority"] = parts[1] if len(parts) > 1 else parts[0]
 
+    # REQ-D Migration: creator -> owner if owner is empty or if creator is present
+    # In v1.9.0, we prioritize 'owner' (处理方).
+    if data.get("creator") and not data.get("owner"):
+        data["owner"] = data["creator"]
+        # Note: We don't write back here, but we might want to log it if we were in a command.
+        # Since parse_issue_file is low-level, we just ensure data consistency.
+    
+    # Creator is no longer a separate concept, but we keep it in the dict for now 
+    # to avoid breaking other parts of code until fully refactored.
+    # But we should ensure 'owner' is what's used.
+
     sections = {}
     current = None
     body_lines = []
@@ -239,13 +321,13 @@ def issue_file_path(project_root: Path, queue: str, issue_id: str) -> Path:
     return get_mai_dir(project_root) / "queues" / queue / f"{issue_id}.md"
 
 
-def _update_issue_file(project_root: Path, data: Dict[str, Any], status: str, remark: Optional[str] = None, new_owner: Optional[str] = None):
+def _update_issue_file(project_root: Path, data: Dict[str, Any], status: str, remark: Optional[str] = None, new_owner: Optional[str] = None, operator: Optional[str] = None):
     """Helper to update issue file status, timeline and optionally owner."""
     if GLOBAL.dry_run:
         return
 
     now = datetime.now().isoformat()
-    agent = os.environ.get("MAI_AGENT", os.environ.get("AGENT_NAME", "unknown"))
+    agent = operator or os.environ.get("MAI_AGENT", os.environ.get("AGENT_NAME", "unknown"))
     emoji = get_status_emoji(project_root).get(status.lower(), "❓")
 
     fpath = Path(data["path"])
@@ -280,17 +362,25 @@ def _update_issue_file(project_root: Path, data: Dict[str, Any], status: str, re
 # Issue Commands
 # ─────────────────────────────────────────────
 
-def cmd_issue_new(project_root: Path, queue: str, title: str, ref: Optional[str], creator: Optional[str] = None, priority: str = "P2"):
+def cmd_issue_new(project_root: Path, queue: str, title: str, ref: Optional[str], priority: str = "P2", operator: Optional[str] = None):
     from .mai import out, err, ensure_mai_structure, suggest
     queue_sla = get_queue_sla(project_root)
     if queue not in queue_sla:
         hint = suggest(queue, list(queue_sla.keys()), "mai queue check")
         err(f"Unknown queue: {queue}.", 1, error="INVALID_QUEUE", hint=hint)
 
+    # REQ-A/B: Resolve operator if not provided (for direct function calls in tests)
+    if operator is None:
+        import os
+        operator = os.environ.get("MAI_OPERATOR") or os.environ.get("MAI_AGENT") or os.environ.get("AGENT_NAME")
+
+    # REQ-B: Permission check for create
+    _check_permission_or_err(project_root, operator, "create", issue={"queue": queue})
+
     ensure_mai_structure(project_root)
     issue_id = next_issue_id(project_root, queue)
     owner, _ = queue_sla[queue]
-    agent = creator or os.environ.get("MAI_AGENT", os.environ.get("AGENT_NAME", "unknown"))
+    agent = operator or "unknown"
     if agent.startswith("@"):
         agent = agent[1:]
 
@@ -302,8 +392,8 @@ def cmd_issue_new(project_root: Path, queue: str, title: str, ref: Optional[str]
         owner=owner,
         ref=ref or "",
         project_root=project_root,
-        creator=agent,
         priority=priority,
+        operator=agent,
     )
 
     if GLOBAL.dry_run:
@@ -321,13 +411,16 @@ def cmd_issue_new(project_root: Path, queue: str, title: str, ref: Optional[str]
         command="issue new", issue_id=issue_id, queue=queue, owner=owner)
 
 
-def cmd_issue_claim(project_root: Path, issue_id: str) -> None:
+def cmd_issue_claim(project_root: Path, issue_id: str, operator: Optional[str] = None) -> None:
     from .mai import out, err
-    agent = os.environ.get("MAI_AGENT", os.environ.get("AGENT_NAME", "unknown"))
+    agent = operator or os.environ.get("MAI_AGENT", os.environ.get("AGENT_NAME", "unknown"))
 
     issue = read_issue(project_root, issue_id)
     if not issue:
         err(f"Issue {issue_id} not found", 1, error="NOT_FOUND")
+
+    # REQ-B: Permission check for claim
+    _check_permission_or_err(project_root, agent, "claim", issue=issue)
 
     if issue["status"].upper() == "COMPLETED":
         err(f"Issue {issue_id} is already COMPLETED. Reopen it first if needed.", 1, error="ALREADY_COMPLETED")
@@ -344,43 +437,52 @@ def cmd_issue_claim(project_root: Path, issue_id: str) -> None:
         err(f"Issue {issue_id} is locked by {lock_info['holder'] if lock_info else 'unknown'} (TTL: {ttl} min).",
             2, error="LOCK_HELD", holder=lock_info["holder"] if lock_info else "unknown", ttl_minutes=ttl)
 
-    _update_issue_file(project_root, issue, "IN_PROGRESS")
+    _update_issue_file(project_root, issue, "IN_PROGRESS", new_owner=agent, operator=agent)
     out(f"Issue {issue_id} claimed by {agent} (Status: IN_PROGRESS).",
         command="issue claim", issue_id=issue_id, holder=agent)
 
 
-def cmd_issue_block(project_root: Path, issue_id: str, reason: str):
+def cmd_issue_block(project_root: Path, issue_id: str, reason: str, operator: Optional[str] = None):
     """REQ-008: Mark issue as BLOCKED."""
     from .mai import out, err
     issue = read_issue(project_root, issue_id)
     if not issue:
         err(f"Issue {issue_id} not found", 1, error="NOT_FOUND")
 
-    _update_issue_file(project_root, issue, "BLOCKED", remark=reason)
+    # REQ-B: Permission check
+    _check_permission_or_err(project_root, operator, "block", issue=issue)
+
+    _update_issue_file(project_root, issue, "BLOCKED", remark=reason, operator=operator)
     out(f"Issue {issue_id} is now BLOCKED: {reason}", command="issue block", issue_id=issue_id)
 
 
-def cmd_issue_unblock(project_root: Path, issue_id: str):
+def cmd_issue_unblock(project_root: Path, issue_id: str, operator: Optional[str] = None):
     """REQ-008: Restore issue from BLOCKED to IN_PROGRESS."""
     from .mai import out, err
     issue = read_issue(project_root, issue_id)
     if not issue:
         err(f"Issue {issue_id} not found", 1, error="NOT_FOUND")
 
+    # REQ-B: Permission check
+    _check_permission_or_err(project_root, operator, "unblock", issue=issue)
+
     if issue["status"].upper() != "BLOCKED":
         out(f"Issue {issue_id} is not blocked (Current: {issue['status']}).", command="issue unblock", idempotent=True)
         return
 
-    _update_issue_file(project_root, issue, "IN_PROGRESS")
+    _update_issue_file(project_root, issue, "IN_PROGRESS", operator=operator)
     out(f"Issue {issue_id} unblocked (Status: IN_PROGRESS).", command="issue unblock", issue_id=issue_id)
 
 
-def cmd_issue_complete(project_root: Path, issue_id: str, conclusion: str) -> None:
+def cmd_issue_complete(project_root: Path, issue_id: str, conclusion: str, operator: Optional[str] = None) -> None:
     from .mai import out, err
-    agent = os.environ.get("MAI_AGENT", os.environ.get("AGENT_NAME", "unknown"))
+    agent = operator or os.environ.get("MAI_AGENT", os.environ.get("AGENT_NAME", "unknown"))
     issue = read_issue(project_root, issue_id)
     if not issue:
         err(f"Issue {issue_id} not found", 1, error="NOT_FOUND")
+
+    # REQ-B: Permission check
+    _check_permission_or_err(project_root, agent, "complete", issue=issue)
 
     if issue["status"].upper() == "COMPLETED":
         out(f"Issue {issue_id} is already COMPLETED.", command="issue complete", idempotent=True)
@@ -404,23 +506,26 @@ def cmd_issue_complete(project_root: Path, issue_id: str, conclusion: str) -> No
             dec_file.write_text(f"# 结论 - Issue {issue_id}\n{complete_entry}")
         sync_to_async(dec_file, project_root)
 
-        _update_issue_file(project_root, issue, "COMPLETED", remark=f"完成：{conclusion}")
+        _update_issue_file(project_root, issue, "COMPLETED", remark=f"完成：{conclusion}", operator=agent)
 
     out(f"Issue {issue_id} completed.", command="issue complete", issue_id=issue_id, dry_run=GLOBAL.dry_run)
 
 
-def cmd_issue_reopen(project_root: Path, issue_id: str, reason: str) -> None:
+def cmd_issue_reopen(project_root: Path, issue_id: str, reason: str, operator: Optional[str] = None) -> None:
     """REQ-017: Reopen a COMPLETED issue."""
     from .mai import out, err
     issue = read_issue(project_root, issue_id)
     if not issue:
         err(f"Issue {issue_id} not found", 1, error="NOT_FOUND")
 
+    # REQ-B: Permission check
+    _check_permission_or_err(project_root, operator, "reopen", issue=issue)
+
     if issue["status"].upper() == "OPEN":
         out(f"Issue {issue_id} is already OPEN.", command="issue reopen", idempotent=True)
         return
 
-    _update_issue_file(project_root, issue, "OPEN", remark=f"重新打开：{reason}")
+    _update_issue_file(project_root, issue, "OPEN", remark=f"重新打开：{reason}", operator=operator)
     out(f"Issue {issue_id} reopened (Status: OPEN).", command="issue reopen", issue_id=issue_id, dry_run=GLOBAL.dry_run)
 
 
@@ -436,23 +541,29 @@ def cmd_issue_status(project_root: Path, issue_id: str) -> None:
         out(f"  {entry}")
 
 
-def cmd_issue_amend(project_root: Path, issue_id: str, remark: str) -> None:
+def cmd_issue_amend(project_root: Path, issue_id: str, remark: str, operator: Optional[str] = None) -> None:
     from .mai import out, err
     issue = read_issue(project_root, issue_id)
     if not issue:
         err(f"Issue {issue_id} not found", 1, error="NOT_FOUND")
 
-    _update_issue_file(project_root, issue, "AMENDED", remark=remark)
+    # REQ-B: Permission check
+    _check_permission_or_err(project_root, operator, "amend", issue=issue)
+
+    _update_issue_file(project_root, issue, "AMENDED", remark=remark, operator=operator)
     out(f"Issue {issue_id} amended.", command="issue amend", issue_id=issue_id)
 
 
-def cmd_issue_escalate(project_root: Path, issue_id: str) -> None:
+def cmd_issue_escalate(project_root: Path, issue_id: str, operator: Optional[str] = None) -> None:
     from .mai import out, err
     issue = read_issue(project_root, issue_id)
     if not issue:
         err(f"Issue {issue_id} not found", 1, error="NOT_FOUND")
 
-    agent = os.environ.get("MAI_AGENT", os.environ.get("AGENT_NAME", "unknown"))
+    # REQ-B: Permission check
+    _check_permission_or_err(project_root, operator, "escalate", issue=issue)
+
+    agent = operator or os.environ.get("MAI_AGENT", os.environ.get("AGENT_NAME", "unknown"))
     queue = "architect-reviews-designer"
     new_id = next_issue_id(project_root, queue)
 
@@ -476,6 +587,7 @@ def cmd_issue_escalate(project_root: Path, issue_id: str) -> None:
         ),
         project_root=project_root,
         priority="P0",
+        operator=agent,
     )
 
     if not GLOBAL.dry_run:
@@ -496,12 +608,15 @@ def _check_lock_for_action(project_root: Path, issue_id: str, agent: str) -> Non
         err(f"Issue {issue_id} is locked by {li['holder']}. Action denied.", 2, error="LOCK_HELD")
 
 
-def cmd_issue_transfer(project_root: Path, issue_id: str, next_handler: str) -> None:
+def cmd_issue_transfer(project_root: Path, issue_id: str, next_handler: str, operator: Optional[str] = None) -> None:
     from .mai import out, err
-    agent = os.environ.get("MAI_AGENT", os.environ.get("AGENT_NAME", "unknown"))
+    agent = operator or os.environ.get("MAI_AGENT", os.environ.get("AGENT_NAME", "unknown"))
     issue = read_issue(project_root, issue_id)
     if not issue:
         err(f"Issue {issue_id} not found", 1, error="NOT_FOUND")
+
+    # REQ-B: Permission check
+    _check_permission_or_err(project_root, agent, "transfer", issue=issue)
 
     if issue["status"].upper() == "COMPLETED":
         err(f"Issue {issue_id} is already COMPLETED. Reopen it first if needed.", 1, error="ALREADY_COMPLETED")
@@ -510,88 +625,47 @@ def cmd_issue_transfer(project_root: Path, issue_id: str, next_handler: str) -> 
 
     if not GLOBAL.dry_run:
         release_lock(project_root, issue_id)
-        _update_issue_file(project_root, issue, "OPEN", remark=f"转交给 @{next_handler}", new_owner=next_handler)
+        _update_issue_file(project_root, issue, "OPEN", remark=f"转交给 @{next_handler}", new_owner=next_handler, operator=agent)
 
     out(f"Issue {issue_id} transferred to {next_handler}.", command="issue transfer", issue_id=issue_id, next_handler=next_handler)
 
 
-def cmd_issue_submit_to_creator(project_root: Path, issue_id: str) -> None:
+def cmd_issue_confirm(project_root: Path, issue_id: str, operator: Optional[str] = None) -> None:
+    # REQ-E: confirm is alias to complete
+    cmd_issue_complete(project_root, issue_id, conclusion="已确认完成", operator=operator)
+
+
+def cmd_issue_reject(project_root: Path, issue_id: str, reason: str, operator: Optional[str] = None) -> None:
     from .mai import out, err
-    agent = os.environ.get("MAI_AGENT", os.environ.get("AGENT_NAME", "unknown"))
+    agent = operator or os.environ.get("MAI_AGENT", os.environ.get("AGENT_NAME", "unknown"))
     issue = read_issue(project_root, issue_id)
     if not issue:
         err(f"Issue {issue_id} not found", 1, error="NOT_FOUND")
 
-    if issue["status"].upper() == "COMPLETED":
-        err(f"Issue {issue_id} is already COMPLETED. Reopen it first if needed.", 1, error="ALREADY_COMPLETED")
-
-    _check_lock_for_action(project_root, issue_id, agent)
-
-    creator = issue.get("creator")
-    if not creator:
-        # Robust fallback: find creator from last timeline entry (oldest)
-        timeline = issue.get("timeline", [])
-        if timeline:
-            first_entry = timeline[-1]
-            m = re.match(r"^\[.*?\]\s+@([^:]+):", first_entry)
-            if m:
-                creator = m.group(1).strip()
-    
-    creator = creator or "unknown"
-
-    if not GLOBAL.dry_run:
-        release_lock(project_root, issue_id)
-        _update_issue_file(project_root, issue, "OPEN", remark=f"提交给创建人 @{creator} 确认", new_owner=creator)
-
-    out(f"Issue {issue_id} submitted to creator {creator}.", command="issue submit-to-creator", issue_id=issue_id, creator=creator)
-
-
-def cmd_issue_confirm(project_root: Path, issue_id: str) -> None:
-    from .mai import out, err
-    agent = os.environ.get("MAI_AGENT", os.environ.get("AGENT_NAME", "unknown"))
-    issue = read_issue(project_root, issue_id)
-    if not issue:
-        err(f"Issue {issue_id} not found", 1, error="NOT_FOUND")
-
-    if issue["status"].upper() == "COMPLETED":
-        out(f"Issue {issue_id} is already COMPLETED.", command="issue confirm", idempotent=True)
-        return
-
-    _check_lock_for_action(project_root, issue_id, agent)
-
-    if not GLOBAL.dry_run:
-        release_lock(project_root, issue_id)
-        _update_issue_file(project_root, issue, "COMPLETED", remark="已由创建人确认完成")
-
-    out(f"Issue {issue_id} confirmed completed.", command="issue confirm", issue_id=issue_id)
-
-
-def cmd_issue_reject(project_root: Path, issue_id: str, reason: str) -> None:
-    from .mai import out, err
-    agent = os.environ.get("MAI_AGENT", os.environ.get("AGENT_NAME", "unknown"))
-    issue = read_issue(project_root, issue_id)
-    if not issue:
-        err(f"Issue {issue_id} not found", 1, error="NOT_FOUND")
+    # REQ-B: Permission check
+    _check_permission_or_err(project_root, agent, "reject", issue=issue)
 
     if issue["status"].upper() == "COMPLETED":
         err(f"Issue {issue_id} is already COMPLETED. Use 'issue reopen' instead.", 1, error="ALREADY_COMPLETED")
 
     _check_lock_for_action(project_root, issue_id, agent)
 
-    # Find previous owner from timeline (last agent who is not the creator or current user)
-    previous_owner = "unknown"
-    creator = issue.get("creator")
+    # Find previous owner from timeline (last agent who is not current user)
+    # If not found, fallback to queue owner
+    queue_sla = get_queue_sla(project_root)
+    previous_owner, _ = queue_sla.get(issue.get("queue", ""), ("unknown", None))
+    
     timeline = issue.get("timeline", [])
     for entry in reversed(timeline):
         m = re.match(r"^\[.*?\]\s+@([^:]+):", entry)
         if m:
             entry_agent = m.group(1).strip()
-            if entry_agent != agent and entry_agent != creator:
+            if entry_agent != agent:
                 previous_owner = entry_agent
                 break
 
     if not GLOBAL.dry_run:
         release_lock(project_root, issue_id)
-        _update_issue_file(project_root, issue, "OPEN", remark=f"退回重做：{reason}", new_owner=previous_owner)
+        _update_issue_file(project_root, issue, "OPEN", remark=f"退回重做：{reason}", new_owner=previous_owner, operator=agent)
 
     out(f"Issue {issue_id} rejected: {reason}", command="issue reject", issue_id=issue_id, reason=reason)

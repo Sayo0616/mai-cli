@@ -9,12 +9,13 @@ import sys
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 def setup_project(root: Path):
-    from mai.config import save_config
+    from mai.config import save_config, clear_config_cache
+    clear_config_cache()
     (root / ".mai").mkdir()
     save_config(root, {
         "queues": {
-            "questions": {"handler": "alice", "sla_minutes": 60},
-            "dev": {"handler": "bob", "sla_minutes": 120}
+            "questions": {"owner": "alice", "sla_minutes": 60},
+            "dev": {"owner": "bob", "sla_minutes": 120}
         },
         "status_emoji": {
             "open": "⭕",
@@ -31,9 +32,9 @@ def test_priority_creation():
         setup_project(root)
         
         # Default priority (P2)
-        cmd_issue_new(root, "questions", "Default Priority", ref=None)
+        cmd_issue_new(root, "questions", "Default Priority", ref=None, operator="alice")
         # P0 priority
-        cmd_issue_new(root, "questions", "High Priority", ref=None, priority="P0")
+        cmd_issue_new(root, "questions", "High Priority", ref=None, priority="P0", operator="alice")
         
         queue_dir = root / ".mai" / "queues" / "questions"
         files = list(queue_dir.glob("*.md"))
@@ -60,13 +61,13 @@ def test_priority_sorting():
         setup_project(root)
         
         # Create in reverse order of priority and time
-        cmd_issue_new(root, "questions", "P2-Old", ref=None, priority="P2")
+        cmd_issue_new(root, "questions", "P2-Old", ref=None, priority="P2", operator="alice")
         time.sleep(0.1)
-        cmd_issue_new(root, "questions", "P1", ref=None, priority="P1")
+        cmd_issue_new(root, "questions", "P1", ref=None, priority="P1", operator="alice")
         time.sleep(0.1)
-        cmd_issue_new(root, "questions", "P0-Old", ref=None, priority="P0")
+        cmd_issue_new(root, "questions", "P0-Old", ref=None, priority="P0", operator="alice")
         time.sleep(0.1)
-        cmd_issue_new(root, "questions", "P0-New", ref=None, priority="P0")
+        cmd_issue_new(root, "questions", "P0-New", ref=None, priority="P0", operator="alice")
         
         issues = list_issues_in_queue(root, "questions")
         
@@ -84,7 +85,7 @@ def test_queue_check_handler_formatting(capsys, monkeypatch):
         setup_project(root)
         GLOBAL.format = "text"
         
-        cmd_issue_new(root, "questions", "Issue for Alice", ref=None, creator="bob")
+        cmd_issue_new(root, "questions", "Issue for Alice", ref=None, operator="alice")
         # Ensure owner is @alice (default for questions queue is alice)
         
         # Test 1: Full check (shows headers)
@@ -112,9 +113,8 @@ def test_handler_matching_with_at_prefix(capsys):
         # Create issue with owner explicitly set to @alice (if we could, but cmd_issue_new uses queue default)
         # Actually cmd_issue_new in my implementation strips @ from agent/creator but make_issue_content adds @ to output.
         # Let's verify our matching logic in cmd_queue_check handles both.
-        
-        cmd_issue_new(root, "questions", "Alice's Issue", ref=None)
-        
+
+        cmd_issue_new(root, "questions", "Alice's Issue", ref=None, operator="alice")        
         # Match with 'alice'
         cmd_queue_check(root, queue=None, overdue=False, handler="alice")
         out1, _ = capsys.readouterr()
@@ -138,9 +138,9 @@ def test_queue_check_json_total_count(monkeypatch):
         setup_project(root)
         GLOBAL.format = "json"
         
-        cmd_issue_new(root, "questions", "Alice 1", ref=None)
-        cmd_issue_new(root, "questions", "Alice 2", ref=None)
-        cmd_issue_new(root, "dev", "Bob 1", ref=None) # Questions default is alice, dev default is bob
+        cmd_issue_new(root, "questions", "Alice 1", ref=None, operator="alice")
+        cmd_issue_new(root, "questions", "Alice 2", ref=None, operator="alice")
+        cmd_issue_new(root, "dev", "Bob 1", ref=None, operator="bob") # Questions default is alice, dev default is bob
         
         f = io.StringIO()
         with redirect_stdout(f):
@@ -164,14 +164,14 @@ def test_issue_escalate_priority():
         cfg = (root / ".mai" / "config.json")
         import json
         data = json.loads(cfg.read_text())
-        data["queues"]["architect-reviews-designer"] = {"handler": "architect", "sla_minutes": 60}
+        data["queues"]["architect-reviews-designer"] = {"owner": "architect", "sla_minutes": 60}
         cfg.write_text(json.dumps(data))
-        
-        cmd_issue_new(root, "questions", "Base Issue", ref=None)
-        issue_id = next((root / ".mai" / "queues" / "questions").glob("*.md")).stem
-        
-        cmd_issue_escalate(root, issue_id)
-        
+
+        cmd_issue_new(root, "questions", "Base Issue", ref=None, operator="alice")
+        issue_id = list((root / ".mai" / "queues" / "questions").glob("*.md"))[0].stem
+
+        # Escalate
+        cmd_issue_escalate(root, issue_id, operator="alice")
         # Find escalated issue
         esc_file = next((root / ".mai" / "queues" / "architect-reviews-designer").glob("*.md"))
         data = parse_issue_file(esc_file)

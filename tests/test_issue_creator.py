@@ -2,50 +2,51 @@ import os
 import tempfile
 import pytest
 from pathlib import Path
-from datetime import datetime
+from mai.issue import cmd_issue_new, parse_issue_file
+from mai.config import save_config, clear_config_cache
 
-import sys
-sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
-
-def test_issue_new_with_creator_override():
-    from mai.issue import cmd_issue_new, parse_issue_file
-    from mai.config import save_config
-    
+def test_issue_new_with_operator_override():
+    """Verify that operator is correctly used as the primary identifier (REQ-A)."""
     with tempfile.TemporaryDirectory() as tmpdir:
         root = Path(tmpdir)
+        clear_config_cache()
         (root / ".mai").mkdir()
         save_config(root, {
-            "queues": {"questions": {"handler": "alice", "sla_minutes": 60}}
+            "queues": {"questions": {"owner": "alice", "sla_minutes": 60}},
+            "agents": {"human_sayo": {}},
+            "root": "human_sayo" # Make it root so it can create
         })
-        
-        # Test 1: Override creator via parameter
-        cmd_issue_new(root, "questions", "Test override", ref=None, creator="human_sayo")
-        
-        # Find the created file
-        issue_file = next((root / ".mai" / "queues" / "questions").glob("*.md"))
-        data = parse_issue_file(issue_file)
-        
-        assert data["creator"] == "human_sayo"
-        assert "**发起方：** @human_sayo" in data["raw"]
 
-def test_issue_new_default_creator(monkeypatch):
-    from mai.issue import cmd_issue_new, parse_issue_file
-    from mai.config import save_config
-    
+        # Test 1: Provide operator via parameter
+        cmd_issue_new(root, "questions", "Test override", ref=None, operator="human_sayo")
+        
+        queue_dir = root / ".mai" / "queues" / "questions"
+        files = list(queue_dir.glob("*.md"))
+        assert len(files) == 1
+        
+        data = parse_issue_file(files[0])
+        assert any("@human_sayo: 创建" in t for t in data["timeline"])
+
+def test_issue_new_default_operator(monkeypatch):
+    """Verify that MAI_AGENT is used if no operator is provided (backward compatibility / fallback)."""
     # Mock environment variable
     monkeypatch.setenv("MAI_AGENT", "auto_coder")
-    
+
     with tempfile.TemporaryDirectory() as tmpdir:
         root = Path(tmpdir)
+        clear_config_cache()
         (root / ".mai").mkdir()
         save_config(root, {
-            "queues": {"questions": {"handler": "alice", "sla_minutes": 60}}
+            "queues": {"questions": {"owner": "alice", "sla_minutes": 60}},
+            "agents": {"auto_coder": {}},
+            "root": "auto_coder"
         })
-        
-        # Test 2: Fallback to environment variable
+
         cmd_issue_new(root, "questions", "Test default", ref=None)
         
-        issue_file = next((root / ".mai" / "queues" / "questions").glob("*.md"))
-        data = parse_issue_file(issue_file)
+        queue_dir = root / ".mai" / "queues" / "questions"
+        files = list(queue_dir.glob("*.md"))
+        assert len(files) == 1
         
-        assert data["creator"] == "auto_coder"
+        data = parse_issue_file(files[0])
+        assert any("@auto_coder: 创建" in t for t in data["timeline"])

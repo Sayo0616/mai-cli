@@ -1,5 +1,15 @@
 # Changelog
 
+## v1.9.0 (2026-04-26)
+- **REQ: 操作署名制 (Operator Signature)** — 所有写操作（`claim`, `complete`, `block`, `unblock`, `transfer`, `amend`, `reopen`, `escalate`）现在强制要求 `--operator <name>` 参数或 `MAI_OPERATOR` 环境变量，确保操作可追溯。
+- **REQ: 权限矩阵实现 (Permission Matrix)** — 引入了核心权限校验逻辑。`complete`、`transfer`、`reopen`、`escalate` 等管理操作仅限 Root 或 Queue Owner 执行；Handler 仅限执行类操作（`claim`, `block`, `amend`）。
+- **REQ: Root 用户配置化** — `config.json` 支持配置 `root` 超级管理员（字符串或列表）。未配置时默认取 OS 用户。`mai status` 同步支持 Root 信息展示。
+- **REQ: 角色合并与模型简化** — 正式将 `creator` 角色合并入 `owner`（队列负责人）。`mai issue new` 移除 `--creator` 参数。
+- **REQ: 命令体系精简** — 移除了冗余的 `submit-to-creator` 子命令（提示改用 `transfer`）。重构 `confirm` 为 `complete` 的静默兼容别名。
+- **UX: 认领交互优化** — `mai issue claim` 现在会同步更新 Issue 文件中的“处理方”字段为认领者，增强实时可视化。
+- **Fix: 退回逻辑增强** — `mai issue reject` 优化了前任负责人的回溯逻辑，优先回退给最近一位非本人的处理人。
+- **向后兼容性** — 实现了动态迁移逻辑，旧版 Issue 文件的 `creator` 字段在读取时自动映射为 `owner`。新增 `clear_config_cache()` 支持高频配置变更的测试环境。
+
 ## v1.8.0 (2026-04-24)
 - **REQ: Issue 优先级支持 (P0/P1/P2)** — 为 Issue 引入了优先级字段。支持通过 `mai issue new --priority P0|P1|P2` 指定紧急程度（默认为 P2）。
 - **REQ: 优先级排序逻辑** — `issue list` 和 `queue check` 现在全局按优先级升序（P0→P1→P2）排序，同优先级内按创建时间升序。

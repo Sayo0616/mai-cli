@@ -13,34 +13,39 @@ mai-cli 通过 flock 原子锁和队列路由协调多 Agent 工作流。
 
 ## Issue 生命周期
 
-```
-# 1. 新建 issue（指定队列，可选优先级，默认 P2）
-mai --project <path> issue new <queue> <title> [--ref <ref-id>] [--creator <name>] [--priority P0|P1|P2]
+所有写操作均需携带 `-o` / `--operator <name>` 参数（REQ-A）。
 
-# 2. 认领 issue（加 flock 锁，状态 → IN_PROGRESS）
-mai --project <path> issue claim <issue-id>
+```
+# 1. 新建 issue（指定队列，优先级默认 P2）
+mai --project <path> issue new <queue> <title> -o <name> [--ref <ref-id>] [--priority P0|P1|P2]
+
+# 2. 认领 issue（加 flock 锁，状态 → IN_PROGRESS，自动成为当前 Handler）
+mai --project <path> issue claim <issue-id> -o <name>
 
 # 3. 如遇阻塞，标记 blocked
-mai --project <path> issue block <issue-id> <原因>
+mai --project <path> issue block <issue-id> <原因> -o <name>
 
 # 4. 解除阻塞
-mai --project <path> issue unblock <issue-id>
+mai --project <path> issue unblock <issue-id> -o <name>
 
-# 5. 完成并提交（释放锁 + 记录结论 + 转交 Creator 确认）
-mai --project <path> issue complete <issue-id> <conclusion>
-mai --project <path> issue submit-to-creator <issue-id>
+# 5. 修订/补充备注
+mai --project <path> issue amend <issue-id> <remark> -o <name>
 
 # 6. 转交任务（自动释放锁，状态保持为 OPEN；注意：仅变更处理人，队列不变）
-mai --project <path> issue transfer <issue-id> <next-handler>
+# 转交后，任务通常由下一位处理人认领，或交还给 Owner 结项
+mai --project <path> issue transfer <issue-id> <next-handler> -o <name>
 
-# 7. Creator 确认与反馈
-# 确认完成（状态 → COMPLETED）
-mai --project <path> issue confirm <issue-id>
-# 拒绝结论（恢复为 OPEN 并提供原因）
-mai --project <path> issue reject <issue-id> <原因>
+# 7. Owner/Root 验收与反馈
+# 确认完成（状态 → COMPLETED，只能由队列负责人或管理员执行）
+mai --project <path> issue complete <issue-id> <conclusion> -o <name>
+# 或使用 alias:
+mai --project <path> issue confirm <issue-id> -o <name>
 
-# 8. 如需重开（记录原因）
-mai --project <path> issue reopen <issue-id> <原因>
+# 拒绝结论（恢复为 OPEN 并退回给前任负责人，只能由负责人或管理员执行）
+mai --project <path> issue reject <issue-id> <原因> -o <name>
+
+# 8. 如需重开（只能由负责人或管理员执行）
+mai --project <path> issue reopen <issue-id> <原因> -o <name>
 ```
 
 ## 队列与检索
@@ -133,11 +138,15 @@ mai --project <path> log undo
 
 ## 注意事项
 
-- **Queue 与 Handler 解耦**：Issue 的 `queue` 在创建时固定，**不随处理过程变更**；`handler`（处理人/owner）可通过 `transfer` / `submit-to-creator` / `reject` 等命令变更
-- claim 后必须 complete 或 block，长期持有锁会阻塞队列
-- `lock release --force` 在 CI/脚本环境使用 `--yes` 跳过交互确认
-- escalation gen 生成文档，issue escalate 执行升级，两者配合使用
-- 详细命令参数和队列配置见下方参考文件
+- **操作署名制**：v1.9.0 后，所有对 Issue 状态或元数据的修改都必须附带 `-o` / `--operator <name>`，否则命令将失败。
+- **角色权责分明**：
+    - **Root**：全权限管理员。
+    - **Owner**：队列负责人。负责 `create`, `complete`, `transfer`, `reject`, `reopen` 等管理操作。
+    - **Handler**：当前处理人。负责执行任务，可进行 `claim`, `amend`, `block`, `unblock` 等操作。执行完毕后需 `transfer` 给 Owner 验收。
+- claim 后必须 transfer 或 block，长期持有锁会阻塞队列。
+- `lock release --force` 在 CI/脚本环境使用 `--yes` 跳过交互确认。
+- escalation gen 生成文档，issue escalate 执行升级，两者配合使用。
+- 详细命令参数和队列配置见下方参考文件。
 
 ## 参考文件
 

@@ -129,6 +129,7 @@ def cmd_issue_show(project_root: Path, issue_id: str):
     lock_info = check_lock(project_root, issue_id)
 
     if GLOBAL.format == "json":
+        # Keep creator in JSON for backward compatibility but suggest migration
         out_json({"ok": True, "command": "issue show", "issue": issue, "lock": lock_info})
     else:
         out(f"\n=== Issue {issue['id']} ===")

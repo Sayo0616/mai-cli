@@ -6,21 +6,20 @@
 
 | 命令 | 说明 |
 |------|------|
-| `issue new <queue> <title> [--ref <id>] [--creator <name>] [--priority P0|P1|P2]` | 新建 issue 到指定队列（--priority 默认 P2） |
-| `issue claim <issue-id>` | 认领 issue（加 flock 锁），状态 → IN_PROGRESS |
-| `issue block <issue-id> <reason>` | 标记 issue 为 BLOCKED（记录原因） |
-| `issue unblock <issue-id>` | 解除 BLOCKED，恢复为 IN_PROGRESS |
-| `issue complete <issue-id> <conclusion>` | 完成 issue（释放锁，记录结论） |
-| `issue reopen <issue-id> <reason>` | 重新打开已完成的 issue（记录原因） |
+| `issue new <queue> <title> -o <name> / --operator <name> [--ref <id>] [--priority P0|P1|P2]` | 新建 issue 到指定队列（--priority 默认 P2） |
+| `issue claim <issue-id> -o <name> / --operator <name>` | 认领 issue（加 flock 锁），状态 → IN_PROGRESS |
+| `issue block <issue-id> <reason> -o <name> / --operator <name>` | 标记 issue 为 BLOCKED（记录原因） |
+| `issue unblock <issue-id> -o <name> / --operator <name>` | 解除 BLOCKED，恢复为 IN_PROGRESS |
+| `issue complete <issue-id> <conclusion> -o <name> / --operator <name>` | 完成 issue（释放锁，记录结论） |
+| `issue reopen <issue-id> <reason> -o <name> / --operator <name>` | 重新打开已完成的 issue（记录原因） |
 | `issue status <issue-id>` | 查看 issue 状态历史时间线 |
-| `issue amend <issue-id> <remark>` | 补充说明或备注 |
+| `issue amend <issue-id> <remark> -o <name> / --operator <name>` | 补充说明或备注 |
 | `issue list [queue] [--handler <name>]` | 列出 Issue（支持按处理人过滤） |
 | `issue show <issue-id>` | 查看 issue 详情 |
-| `issue transfer <issue-id> <next-handler>` | 转交 Issue 给下一位处理人（自动释放锁；**注意**：仅变更处理人，队列不变） |
-| `issue submit-to-creator <issue-id>` | 将 Issue 提交给发起方（Creator）确认 |
-| `issue confirm <issue-id>` | 发起方确认 Issue 完成，状态 → COMPLETED |
-| `issue reject <issue-id> <reason>` | 发起方拒绝 Issue 结论，状态恢复为 OPEN |
-| `issue escalate <issue-id>` | 将 issue 升级到上级处理 |
+| `issue transfer <issue-id> <next-handler> -o <name> / --operator <name>` | 转交 Issue 给下一位处理人（自动释放锁；**注意**：仅变更处理人，队列不变） |
+| `issue confirm <issue-id> -o <name> / --operator <name>` | [Alias to complete] 确认 Issue 完成，状态 → COMPLETED |
+| `issue reject <issue-id> <reason> -o <name> / --operator <name>` | 拒绝 Issue 结论，状态恢复为 OPEN |
+| `issue escalate <issue-id> -o <name> / --operator <name>` | 将 issue 升级到上级处理 |
 
 ## queue 子命令
 

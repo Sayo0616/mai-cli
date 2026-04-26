@@ -216,16 +216,14 @@ def test_cmd_agent_add():
         assert "programmer" in config["queues"]
         assert config["queues"]["programmer"]["handler"] == "programmer"
 
-def test_make_issue_content_with_creator():
+def test_make_issue_content_basic():
     from mai.issue import make_issue_content
     content = make_issue_content(
         issue_id="REQ-001",
         queue="questions",
         title="Test",
-        owner="alice",
-        creator="bob"
+        owner="alice"
     )
-    assert "**发起方：** @bob" in content
     assert "**处理方：** @alice" in content
 
 def test_daily_summary_concurrent_write():

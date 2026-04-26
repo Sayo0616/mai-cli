@@ -15,7 +15,7 @@ from importlib.metadata import version, PackageNotFoundError
 try:
     __version__ = version("mai-cli")
 except PackageNotFoundError:
-    __version__ = "1.8.0"
+    __version__ = "1.9.0"
 
 from .config import (
     get_mai_dir, get_async_dir, find_project_root,
@@ -140,26 +140,32 @@ def build_parser():
     p = iss.add_parser("new", help="Create new issue")
     p.add_argument("queue"); p.add_argument("title")
     p.add_argument("--ref", default=None)
-    p.add_argument("--creator", default=None, help="Override the issue creator (default: current agent)")
     p.add_argument("--priority", choices=["P0", "P1", "P2"], default="P2", help="Issue priority (default: P2)")
+    p.add_argument("-o", "--operator", help="Operator name (required for write actions)")
 
     p = iss.add_parser("amend", help="Amend issue")
     p.add_argument("issue_id"); p.add_argument("remark", nargs="?", default="")
+    p.add_argument("-o", "--operator", help="Operator name (required for write actions)")
 
     p = iss.add_parser("claim", help="Claim issue")
     p.add_argument("issue_id")
+    p.add_argument("-o", "--operator", help="Operator name (required for write actions)")
 
     p = iss.add_parser("block", help="Block an issue")
     p.add_argument("issue_id"); p.add_argument("reason")
+    p.add_argument("-o", "--operator", help="Operator name (required for write actions)")
 
     p = iss.add_parser("unblock", help="Unblock an issue")
     p.add_argument("issue_id")
+    p.add_argument("-o", "--operator", help="Operator name (required for write actions)")
 
     p = iss.add_parser("complete", help="Complete an issue")
     p.add_argument("issue_id"); p.add_argument("conclusion")
+    p.add_argument("-o", "--operator", help="Operator name (required for write actions)")
 
     p = iss.add_parser("reopen", help="Reopen a completed issue")
     p.add_argument("issue_id"); p.add_argument("reason")
+    p.add_argument("-o", "--operator", help="Operator name (required for write actions)")
 
     p = iss.add_parser("status", help="Show issue status history")
     p.add_argument("issue_id")
@@ -170,21 +176,26 @@ def build_parser():
 
     p = iss.add_parser("transfer", help="Transfer issue to another handler")
     p.add_argument("issue_id"); p.add_argument("next_handler")
+    p.add_argument("-o", "--operator", help="Operator name (required for write actions)")
 
-    p = iss.add_parser("submit-to-creator", help="Submit issue to creator for confirmation")
+    # Deprecated/Removed
+    p = iss.add_parser("submit-to-creator", help="[REMOVED] Use transfer instead")
     p.add_argument("issue_id")
 
-    p = iss.add_parser("confirm", help="Confirm issue completion (creator only)")
+    p = iss.add_parser("confirm", help="Confirm issue completion (owner only)")
     p.add_argument("issue_id")
+    p.add_argument("-o", "--operator", help="Operator name (required for write actions)")
 
-    p = iss.add_parser("reject", help="Reject and reopen issue (creator only)")
+    p = iss.add_parser("reject", help="Reject and reopen issue (owner only)")
     p.add_argument("issue_id"); p.add_argument("reason")
+    p.add_argument("-o", "--operator", help="Operator name (required for write actions)")
 
     p = iss.add_parser("show", help="Show issue")
     p.add_argument("issue_id")
 
     p = iss.add_parser("escalate", help="Escalate issue")
     p.add_argument("issue_id")
+    p.add_argument("-o", "--operator", help="Operator name (required for write actions)")
 
     # ── queue ──
     queue_sp = sub.add_parser("queue")
@@ -272,7 +283,10 @@ def cmd_status(project_root: Path, verbose: bool = False):
     from .config import get_queue_sla
 
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    from .config import get_roots
+    roots = get_roots(project_root)
     out(f"Project: {project_root}")
+    out(f"Roots:   {', '.join(roots)}")
     out(f"Updated: {now}\n")
 
     # 1. Queues
@@ -392,46 +406,73 @@ def dispatch(args) -> None:
         err(str(e), 1, error="INTERNAL_ERROR")
 
 
+def get_operator(args) -> str:
+    """REQ-A: Resolve operator name from args or environment."""
+    op = getattr(args, "operator", None)
+    if not op:
+        op = os.environ.get("MAI_OPERATOR")
+    if not op:
+        # Fallback to MAI_AGENT or AGENT_NAME for backward compatibility if needed, 
+        # but REQ-A says it must be provided.
+        op = os.environ.get("MAI_AGENT") or os.environ.get("AGENT_NAME")
+    
+    if not op:
+        err("操作需要 --operator 参数，如：mai issue claim <id> --operator <name>",
+            1, error="OPERATOR_REQUIRED")
+    return op
+
+
 def dispatch_issue(args, project_root: Path) -> None:
     from .issue import (
         cmd_issue_new, cmd_issue_amend, cmd_issue_claim,
         cmd_issue_complete, cmd_issue_block, cmd_issue_unblock,
         cmd_issue_reopen, cmd_issue_status,
-        cmd_issue_transfer, cmd_issue_submit_to_creator,
+        cmd_issue_transfer,
         cmd_issue_confirm, cmd_issue_reject,
     )
     from .issue_list import cmd_issue_list, cmd_issue_show
     if args.issue_cmd == "new":
-        cmd_issue_new(project_root, args.queue, args.title, args.ref, getattr(args, "creator", None), getattr(args, "priority", "P2"))
+        op = get_operator(args)
+        cmd_issue_new(project_root, args.queue, args.title, args.ref, getattr(args, "priority", "P2"), operator=op)
     elif args.issue_cmd == "amend":
-        cmd_issue_amend(project_root, args.issue_id, args.remark)
+        op = get_operator(args)
+        cmd_issue_amend(project_root, args.issue_id, args.remark, operator=op)
     elif args.issue_cmd == "claim":
-        cmd_issue_claim(project_root, args.issue_id)
+        op = get_operator(args)
+        cmd_issue_claim(project_root, args.issue_id, operator=op)
     elif args.issue_cmd == "block":
-        cmd_issue_block(project_root, args.issue_id, args.reason)
+        op = get_operator(args)
+        cmd_issue_block(project_root, args.issue_id, args.reason, operator=op)
     elif args.issue_cmd == "unblock":
-        cmd_issue_unblock(project_root, args.issue_id)
+        op = get_operator(args)
+        cmd_issue_unblock(project_root, args.issue_id, operator=op)
     elif args.issue_cmd == "complete":
-        cmd_issue_complete(project_root, args.issue_id, args.conclusion)
+        op = get_operator(args)
+        cmd_issue_complete(project_root, args.issue_id, args.conclusion, operator=op)
     elif args.issue_cmd == "reopen":
-        cmd_issue_reopen(project_root, args.issue_id, args.reason)
+        op = get_operator(args)
+        cmd_issue_reopen(project_root, args.issue_id, args.reason, operator=op)
     elif args.issue_cmd == "status":
         cmd_issue_status(project_root, args.issue_id)
     elif args.issue_cmd == "list":
         cmd_issue_list(project_root, args.queue, getattr(args, "handler", None))
     elif args.issue_cmd == "transfer":
-        cmd_issue_transfer(project_root, args.issue_id, args.next_handler)
+        op = get_operator(args)
+        cmd_issue_transfer(project_root, args.issue_id, args.next_handler, operator=op)
     elif args.issue_cmd == "submit-to-creator":
-        cmd_issue_submit_to_creator(project_root, args.issue_id)
+        err("Command 'submit-to-creator' is removed. Please use 'transfer <issue-id> <next-handler>' instead.", 1)
     elif args.issue_cmd == "confirm":
-        cmd_issue_confirm(project_root, args.issue_id)
+        op = get_operator(args)
+        cmd_issue_confirm(project_root, args.issue_id, operator=op)
     elif args.issue_cmd == "reject":
-        cmd_issue_reject(project_root, args.issue_id, args.reason)
+        op = get_operator(args)
+        cmd_issue_reject(project_root, args.issue_id, args.reason, operator=op)
     elif args.issue_cmd == "show":
         cmd_issue_show(project_root, args.issue_id)
     elif args.issue_cmd == "escalate":
         from .issue import cmd_issue_escalate
-        cmd_issue_escalate(project_root, args.issue_id)
+        op = get_operator(args)
+        cmd_issue_escalate(project_root, args.issue_id, operator=op)
 
 
 def dispatch_queue(args, project_root: Path) -> None:

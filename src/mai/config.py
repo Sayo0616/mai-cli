@@ -64,6 +64,11 @@ class GlobalArgs:
 GLOBAL = GlobalArgs()
 
 
+def clear_config_cache():
+    """Clear the global config cache. Primarily for testing."""
+    GLOBAL._config_cache.clear()
+
+
 def get_config(project_root: Path) -> Dict[str, Any]:
     """Load config from .mai/config.json, merged with defaults. Keyed by project_root."""
     root_key = str(project_root.resolve())
@@ -111,10 +116,27 @@ def get_config(project_root: Path) -> Dict[str, Any]:
         "agents":                 {**DEFAULT_AGENTS, **base.get("agents", {})},
         "daily_summary_order":    base.get("daily_summary_order") or DEFAULT_DAILY_ORDER,
         "issue_status_emoji":      {**DEFAULT_EMOJI, **base.get("issue_status_emoji", {})},
+        "root":                   base.get("root", []),
         "raw":                    base,
     }
     GLOBAL._config_cache[root_key] = cfg
     return cfg
+
+
+def get_roots(project_root: Path) -> List[str]:
+    """REQ-C: Get root users from config. Fallback to OS user if not configured."""
+    cfg = get_config(project_root)
+    root = cfg.get("root", [])
+    if not root:
+        import getpass
+        try:
+            return [getpass.getuser()]
+        except Exception:
+            return ["unknown"]
+    
+    if isinstance(root, str):
+        return [root]
+    return root
 
 
 def get_heartbeat_intervals(project_root: Path) -> Dict[str, int]:

@@ -124,24 +124,29 @@ mai [-v|--version] [--project <项目名>] [--format json|text] [--dry-run] <子
 | `--dry-run` | 只展示，不实际执行修改 |
 
 ### issue — Issue 生命周期
+所有写操作均需携带 `-o` / `--operator <name>` 参数或设置 `MAI_OPERATOR` 环境变量。
 
 | 命令 | 说明 |
 |:---|:---|
-| `mai issue new <queue> <标题> [--ref <id>] [--creator <name>] [--priority P0|P1|P2]` | 创建 Issue，自动分配 ID，可指定发起方和优先级（默认 P2） |
-| `mai issue claim <issue-id>` | 认领（获取锁），状态 → IN_PROGRESS |
-| `mai issue block <issue-id> <原因>` | 标记为 BLOCKED（记录原因） |
-| `mai issue unblock <issue-id>` | 解除 BLOCKED，恢复 IN_PROGRESS |
-| `mai issue complete <issue-id> <结论>` | 完成工作（获取结论） |
-| `mai issue transfer <issue-id> <处理人>` | 转交任务（自动释放锁；**注意**：仅变更处理人，队列不变） |
-| `mai issue submit-to-creator <issue-id>` | 提交给发起方确认 |
-| `mai issue confirm <issue-id>` | 发起方确认完成（状态 → COMPLETED） |
-| `mai issue reject <issue-id> <原因>` | 发起方拒绝结论（状态恢复 OPEN） |
-| `mai issue reopen <issue-id> <原因>` | 重新打开已完成 Issue |
+| `mai issue new <queue> <标题> -o <name> [--ref <id>] [--priority P0|P1|P2]` | 创建 Issue，自动分配 ID，优先级默认 P2 |
+| `mai issue claim <issue-id> -o <name>` | 认领（获取锁），状态 → IN_PROGRESS |
+| `mai issue block <issue-id> <原因> -o <name>` | 标记为 BLOCKED（记录原因） |
+| `mai issue unblock <issue-id> -o <name>` | 解除 BLOCKED，恢复 IN_PROGRESS |
+| `mai issue complete <issue-id> <结论> -o <name>` | 完成工作（结项，需由队列负责人执行） |
+| `mai issue transfer <issue-id> <处理人> -o <name>` | 转交任务（自动释放锁；**注意**：仅变更处理人，队列不变） |
+| `mai issue confirm <issue-id> -o <name>` | [Alias to complete] 确认完成（状态 → COMPLETED） |
+| `mai issue reject <issue-id> <原因> -o <name>` | 拒绝结论（状态恢复 OPEN） |
+| `mai issue reopen <issue-id> <原因> -o <name>` | 重新打开已完成 Issue |
 | `mai issue status <issue-id>` | 查看状态历史时间线 |
-| `mai issue amend <issue-id> <备注>` | 追加修订记录 |
+| `mai issue amend <issue-id> <备注> -o <name>` | 追加修订记录 |
 | `mai issue list [queue]` | 列出 Issue |
 | `mai issue show <issue-id>` | 显示详情 |
-| `mai issue escalate <issue-id>` | 升级为冲突 |
+| `mai issue escalate <issue-id> -o <name>` | 升级为冲突 |
+
+**环境变量**:
+- `MAI_OPERATOR`: 默认操作者名字。
+- `MAI_PROJECT`: 项目根目录路径。
+- `MAI_AGENT`: 旧版 Agent 名字（作为 operator 的 fallback）。
 
 ### queue — 队列扫描
 
@@ -225,7 +230,7 @@ mai [-v|--version] [--project <项目名>] [--format json|text] [--dry-run] <子
 ...
 ---
 
-*Mai CLI v1.8.0*
+*Mai CLI v1.9.0*
 
 | 0 | 成功 |
 | 1 | 一般错误（参数错误、Issue 未找到等） |
@@ -279,4 +284,4 @@ MIT License — 详见 [LICENSE](./LICENSE)
 
 ---
 
-*Mai CLI v1.8.0*
+*Mai CLI v1.9.0*
