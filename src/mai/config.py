@@ -45,6 +45,7 @@ DEFAULT_EMOJI = {
     "amended":       "📝",
     "escalated":     "⚠️",
     "overdue":       "⏱️",
+    "discarded":     "🗑️",
 }
 
 # Deprecated: use DEFAULT_DAILY_ORDER
@@ -121,22 +122,6 @@ def get_config(project_root: Path) -> Dict[str, Any]:
     }
     GLOBAL._config_cache[root_key] = cfg
     return cfg
-
-
-def get_roots(project_root: Path) -> List[str]:
-    """REQ-C: Get root users from config. Fallback to OS user if not configured."""
-    cfg = get_config(project_root)
-    root = cfg.get("root", [])
-    if not root:
-        import getpass
-        try:
-            return [getpass.getuser()]
-        except Exception:
-            return ["unknown"]
-    
-    if isinstance(root, str):
-        return [root]
-    return root
 
 
 def get_heartbeat_intervals(project_root: Path) -> Dict[str, int]:

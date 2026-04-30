@@ -1,9 +1,12 @@
-"""Mai CLI - Project init module.
-
+"""Mai CLI - Project management module.
 """
 
+import shutil
+import os
+import getpass
 from datetime import datetime
 from pathlib import Path
+from typing import Optional
 
 from .config import (
     find_project_root, get_mai_dir, get_async_dir,
@@ -11,6 +14,8 @@ from .config import (
     DEFAULT_QUEUES, DEFAULT_AGENTS, DEFAULT_DAILY_ORDER, DEFAULT_EMOJI,
 )
 from .sync import sync_to_async
+from .permission import check_project_permission
+from .project_registry import add_project, remove_project
 
 
 def ensure_mai_structure(project_root: Path):
@@ -33,7 +38,10 @@ def ensure_mai_structure(project_root: Path):
 
 
 def cmd_project_init(project_name: str, operator: str = None):
-    """Initialize a new project with Mai directory structure."""
+    """Initialize a new project with Mai directory structure (v1.10.0)."""
+    from .mai import out, err
+
+    # 1. Determine project root
     if project_name == "." or isinstance(project_name, Path):
         project_root = Path(project_name).resolve()
     else:
@@ -42,46 +50,90 @@ def cmd_project_init(project_name: str, operator: str = None):
             projects_dir = Path.home() / ".openclaw" / "workspace" / "projects" / project_name
             if not GLOBAL.dry_run:
                 projects_dir.mkdir(parents=True, exist_ok=True)
-                (projects_dir / "AGENTS.md").write_text(
-                    f"# {project_name}\n\n协作项目于 {datetime.now().isoformat()} 初始化。\n"
-                )
+                agents_file = projects_dir / "AGENTS.md"
+                if not agents_file.exists():
+                    agents_file.write_text(f"# {project_name}\n\n协作项目于 {datetime.now().isoformat()} 初始化。\n")
             project_root = projects_dir
 
-    if not GLOBAL.dry_run:
-        # REQ-1.9.2: Check permission for project init
-        from .issue import _check_permission_or_err
-        from .config import get_roots
-        import getpass
-        
-        # If no operator provided, fallback to OS user for the check
-        check_op = operator or getpass.getuser()
-        _check_permission_or_err(project_root, check_op, "init")
+    # 2. Check Permission (Root Only)
+    check_op = operator or os.environ.get("MAI_AGENT") or getpass.getuser()
+    if not check_project_permission(project_root, check_op, "init"):
+        err(f"权限不足：只有 root 用户可以初始化项目。当前用户: '{check_op}'", 3, error="PERMISSION_DENIED")
 
-    ensure_mai_structure(project_root)
-
-    base_config = load_config(project_root)
-
-    if base_config.get("initialized_at"):
-        from .mai import out
-        out(f"Project '{project_root.name}' already initialized.", command="project init", idempotent=True)
-        return
+    # 3. Check if already initialized — check .mai/config.json existence first
+    mai_dir = get_mai_dir(project_root)
+    cfg_file = mai_dir / "config.json"
+    if cfg_file.exists():
+        existing = load_config(project_root)
+        if existing.get("initialized_at"):
+            err(f"项目 '{project_root}' 已经初始化，禁止重复操作。", 1, error="ALREADY_INITIALIZED")
 
     if GLOBAL.dry_run:
-        from .mai import out
         out(f"[dry-run] Would initialize project structure in '{project_root}'", command="project init", project_root=str(project_root))
         return
 
-    if not GLOBAL.dry_run:
-        new_config = dict(base_config)
-        new_config["name"] = project_root.name
-        new_config["initialized_at"] = datetime.now().isoformat()
-        new_config["queues"] = DEFAULT_QUEUES
-        new_config["agents"] = DEFAULT_AGENTS
-        new_config["daily_summary_order"] = DEFAULT_DAILY_ORDER
-        new_config["issue_status_emoji"] = DEFAULT_EMOJI
-        save_config(project_root, new_config)
-        cfg_file = get_mai_dir(project_root) / "config.json"
-        sync_to_async(cfg_file, project_root)
+    # 4. Create structure and save config
+    ensure_mai_structure(project_root)
 
-    from .mai import out
+    new_config = {}
+    if cfg_file.exists():
+        new_config = load_config(project_root)
+    new_config["name"] = project_root.name
+    new_config["initialized_at"] = datetime.now().isoformat()
+    new_config["queues"] = DEFAULT_QUEUES
+    new_config["agents"] = DEFAULT_AGENTS
+    new_config["daily_summary_order"] = DEFAULT_DAILY_ORDER
+    new_config["issue_status_emoji"] = DEFAULT_EMOJI
+    new_config["root"] = new_config.get("root", [])
+
+    save_config(project_root, new_config)
+    sync_to_async(cfg_file, project_root)
+
+    # 5. Register in Global Registry
+    add_project(
+        name=project_root.name,
+        path=str(project_root),
+        description=f"Mai Project {project_root.name}",
+        agents=list(new_config["agents"].keys())
+    )
+
     out(f"Project '{project_root.name}' initialized at {project_root}.", command="project init")
+
+
+def cmd_project_delete(project_name: str, operator: str = None):
+    """Delete a mai project. Root only."""
+    from .mai import out, err
+
+    # Try to find by name in registry or as path
+    project_root = None
+    from .project_registry import list_projects
+    for p in list_projects():
+        if p["name"] == project_name:
+            project_root = Path(p["path"])
+            break
+
+    if not project_root:
+        project_root = find_project_root(project_name)
+
+    if not project_root or not project_root.exists():
+        err(f"Project '{project_name}' not found.", 1, error="NOT_FOUND")
+
+    # Check Permission (Root Only)
+    check_op = operator or os.environ.get("MAI_AGENT") or getpass.getuser()
+    if not check_project_permission(project_root, check_op, "delete_project"):
+        err(f"权限不足：只有 root 用户可以删除项目。当前用户: '{check_op}'", 3, error="PERMISSION_DENIED")
+
+    if GLOBAL.dry_run:
+        out(f"[dry-run] Would delete project '{project_name}' at '{project_root}'", command="project delete")
+        return
+
+    # Delete physical first — if this fails, registry stays intact
+    project_name_resolved = project_root.name
+    try:
+        shutil.rmtree(project_root)
+    except Exception as e:
+        err(f"Failed to delete project directory: {e}", 1, error="DELETE_FAILED")
+
+    # Only unregister after successful physical delete
+    remove_project(project_name_resolved)
+    out(f"Project '{project_name}' deleted successfully.", command="project delete")

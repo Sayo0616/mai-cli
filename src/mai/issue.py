@@ -16,82 +16,20 @@ from .config import (
 from .sync import sync_to_async
 from .lock import acquire_lock, release_lock, check_lock
 from .log import write_history
-
-
-def check_permission(project_root: Path, operator: str, action: str, issue: Optional[Dict[str, Any]] = None):
-    """REQ-B: Core Permission Matrix check."""
-    from .config import get_roots, get_queue_sla
-    roots = get_roots(project_root)
-    if operator in roots:
-        return True
-
-    # Get roles
-    is_owner = False
-    is_handler = False
-
-    if issue:
-        queue = issue.get("queue")
-        queue_sla = get_queue_sla(project_root)
-        q_owner, _ = queue_sla.get(queue, (None, None))
-        if q_owner and operator == q_owner:
-            is_owner = True
-        
-        # handler is the current owner of the issue (who claimed it)
-        if issue.get("owner") == operator:
-            is_handler = True
-        
-        # Backward compatibility for 'creator' if still using v1.8 concepts
-        if not is_owner and issue.get("creator") == operator:
-            # In v1.9.0 REQ-D, creator is merged to owner, but for now we might still need this check
-            # or treat creator as owner for legacy issues.
-            is_owner = True
-
-    # Permission Matrix
-    # read is always True (handled by caller not calling check_permission for read)
-    
-    if action == "create":
-        # Check if operator is root or queue owner
-        from .config import get_queue_sla
-        queue_sla = get_queue_sla(project_root)
-        q_owner, _ = queue_sla.get(issue.get("queue") if issue else "", (None, None))
-        return operator == q_owner
-
-    if action == "claim":
-        # REQ-B says root, owner, handler can claim.
-        # Handler here likely means any registered agent who can perform work, 
-        # but since we don't have a 'handler' list, we might just allow all known agents 
-        # OR just root and owner for now if we want to be strict.
-        # Actually, let's allow all registered agents to claim for now, 
-        # but REQ-B specifically says 'handler ✅'.
-        # If we treat 'handler' as 'any agent registered in config.json', let's check that.
-        from .config import get_config
-        cfg = get_config(project_root)
-        is_registered_agent = operator in cfg.get("agents", {})
-        return is_owner or is_registered_agent
-
-    if action == "complete":
-        return is_owner
-    
-    if action in ["block", "unblock"]:
-        return is_owner or is_handler
-    
-    if action in ["transfer", "amend"]:
-        return is_owner or is_handler
-    
-    if action in ["reopen", "escalate"]:
-        return is_owner
-
-    if action in ["confirm", "reject"]:
-        # REQ-E says root and owner
-        return is_owner
-
-    return False
+from .permission import check_permission, check_project_permission
 
 
 def _check_permission_or_err(project_root: Path, operator: str, action: str, issue: Optional[Dict[str, Any]] = None):
     from .mai import err
     if not check_permission(project_root, operator, action, issue):
         err(f"权限不足：用户 '{operator}' 无权执行 '{action}' 操作。", 3, error="PERMISSION_DENIED")
+
+
+def _ensure_not_discarded(issue: Dict[str, Any], action: str = "modify"):
+    """Check that issue is not in DISCARDED terminal state."""
+    from .mai import err
+    if issue.get("status", "").upper() == "DISCARDED":
+        err(f"无法{action}：工单 {issue['id']} 已废弃（DISCARDED），不可修改。", 1, error="ISSUE_DISCARDED")
 
 
 # ─────────────────────────────────────────────
@@ -424,6 +362,7 @@ def cmd_issue_claim(project_root: Path, issue_id: str, operator: Optional[str] =
 
     # REQ-B: Permission check for claim
     _check_permission_or_err(project_root, agent, "claim", issue=issue)
+    _ensure_not_discarded(issue, "认领")
 
     if issue["status"].upper() == "COMPLETED":
         err(f"Issue {issue_id} is already COMPLETED. Reopen it first if needed.", 1, error="ALREADY_COMPLETED")
@@ -454,6 +393,7 @@ def cmd_issue_block(project_root: Path, issue_id: str, reason: str, operator: Op
 
     # REQ-B: Permission check
     _check_permission_or_err(project_root, operator, "block", issue=issue)
+    _ensure_not_discarded(issue, "阻塞")
 
     _update_issue_file(project_root, issue, "BLOCKED", remark=reason, operator=operator)
     out(f"Issue {issue_id} is now BLOCKED: {reason}", command="issue block", issue_id=issue_id)
@@ -486,6 +426,7 @@ def cmd_issue_complete(project_root: Path, issue_id: str, conclusion: str, opera
 
     # REQ-B: Permission check
     _check_permission_or_err(project_root, agent, "complete", issue=issue)
+    _ensure_not_discarded(issue, "完成")
 
     if issue["status"].upper() == "COMPLETED":
         out(f"Issue {issue_id} is already COMPLETED.", command="issue complete", idempotent=True)
@@ -523,6 +464,7 @@ def cmd_issue_reopen(project_root: Path, issue_id: str, reason: str, operator: O
 
     # REQ-B: Permission check
     _check_permission_or_err(project_root, operator, "reopen", issue=issue)
+    _ensure_not_discarded(issue, "重新打开")
 
     if issue["status"].upper() == "OPEN":
         out(f"Issue {issue_id} is already OPEN.", command="issue reopen", idempotent=True)
@@ -552,6 +494,7 @@ def cmd_issue_amend(project_root: Path, issue_id: str, remark: str, operator: Op
 
     # REQ-B: Permission check
     _check_permission_or_err(project_root, operator, "amend", issue=issue)
+    _ensure_not_discarded(issue, "修改")
 
     _update_issue_file(project_root, issue, "AMENDED", remark=remark, operator=operator)
     out(f"Issue {issue_id} amended.", command="issue amend", issue_id=issue_id)
@@ -565,6 +508,7 @@ def cmd_issue_escalate(project_root: Path, issue_id: str, operator: Optional[str
 
     # REQ-B: Permission check
     _check_permission_or_err(project_root, operator, "escalate", issue=issue)
+    _ensure_not_discarded(issue, "升级")
 
     agent = operator or os.environ.get("MAI_AGENT", os.environ.get("AGENT_NAME", "unknown"))
     queue = "architect-reviews-designer"
@@ -620,6 +564,7 @@ def cmd_issue_transfer(project_root: Path, issue_id: str, next_handler: str, ope
 
     # REQ-B: Permission check
     _check_permission_or_err(project_root, agent, "transfer", issue=issue)
+    _ensure_not_discarded(issue, "转交")
 
     if issue["status"].upper() == "COMPLETED":
         err(f"Issue {issue_id} is already COMPLETED. Reopen it first if needed.", 1, error="ALREADY_COMPLETED")
@@ -647,6 +592,7 @@ def cmd_issue_reject(project_root: Path, issue_id: str, reason: str, operator: O
 
     # REQ-B: Permission check
     _check_permission_or_err(project_root, agent, "reject", issue=issue)
+    _ensure_not_discarded(issue, "退回")
 
     if issue["status"].upper() == "COMPLETED":
         err(f"Issue {issue_id} is already COMPLETED. Use 'issue reopen' instead.", 1, error="ALREADY_COMPLETED")
@@ -672,3 +618,26 @@ def cmd_issue_reject(project_root: Path, issue_id: str, reason: str, operator: O
         _update_issue_file(project_root, issue, "OPEN", remark=f"退回重做：{reason}", new_owner=previous_owner, operator=agent)
 
     out(f"Issue {issue_id} rejected: {reason}", command="issue reject", issue_id=issue_id, reason=reason)
+
+def cmd_issue_discard(project_root: Path, issue_id: str, reason: str, operator: Optional[str] = None) -> None:
+    """New in v1.10.0: Discard an issue. Action for root/owner."""
+    from .mai import out, err
+    issue = read_issue(project_root, issue_id)
+    if not issue:
+        err(f"Issue {issue_id} not found.", 1, error="NOT_FOUND")
+
+    agent = operator or os.environ.get("MAI_AGENT", "unknown")
+    _check_permission_or_err(project_root, agent, "discard", issue=issue)
+
+    if issue["status"].upper() == "DISCARDED":
+        out(f"Issue {issue_id} is already DISCARDED.", command="issue discard", idempotent=True)
+        return
+
+    if not GLOBAL.dry_run:
+        try:
+            release_lock(project_root, issue_id)
+        except Exception:
+            pass
+        _update_issue_file(project_root, issue, "DISCARDED", remark=f"废弃工单：{reason}", operator=agent)
+
+    out(f"Issue {issue_id} discarded: {reason}", command="issue discard", issue_id=issue_id, status="DISCARDED")

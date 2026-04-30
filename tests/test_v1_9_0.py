@@ -105,24 +105,27 @@ def test_permission_matrix(monkeypatch):
         assert check_permission(root, "alice", "complete", issue=issue) is True
 
 def test_root_config():
-    from mai.config import get_roots
+    from mai.permission import get_all_roots
+    from mai.global_config import get_global_config_dir, save_global_config
+    from unittest.mock import patch
     with tempfile.TemporaryDirectory() as tmpdir:
         root_path = Path(tmpdir)
-        
-        # 1. No root in config -> fallback to OS user
-        setup_project(root_path)
-        roots = get_roots(root_path)
-        assert getpass.getuser() in roots
-        
-        # 2. Single root string
-        shutil.rmtree(root_path / ".mai")
-        setup_project(root_path, roots="sayo")
-        assert get_roots(root_path) == ["sayo"]
-        
-        # 3. Multiple roots list
-        shutil.rmtree(root_path / ".mai")
-        setup_project(root_path, roots=["sayo", "admin"])
-        assert get_roots(root_path) == ["sayo", "admin"]
+
+        # Mock home to isolate global config
+        with patch("pathlib.Path.home", return_value=root_path / "home"):
+            # Setup global config with roots
+            save_global_config({"root": ["sayo", "admin"]})
+            # Verify global config was created
+            global_roots_path = get_global_config_dir() / "config.json"
+            assert global_roots_path.exists()
+
+            # Set up local project
+            setup_project(root_path)
+
+            # get_all_roots reads both global + local
+            roots = get_all_roots(root_path)
+            assert "sayo" in roots
+            assert "admin" in roots
 
 def test_creator_to_owner_migration():
     from mai.issue import parse_issue_file
