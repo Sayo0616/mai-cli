@@ -137,9 +137,15 @@ def cmd_project_delete(project_name: str, operator: str = None):
     # Delete physical first — if this fails, registry stays intact
     project_name_resolved = project_root.name
     try:
-        shutil.rmtree(project_root)
+        mai_dir = get_mai_dir(project_root)
+        async_dir = get_async_dir(project_root)
+        
+        if mai_dir.exists():
+            shutil.rmtree(mai_dir)
+        if async_dir.exists():
+            shutil.rmtree(async_dir)
     except Exception as e:
-        err(f"Failed to delete project directory: {e}", 1, error="DELETE_FAILED")
+        err(f"Failed to delete project metadata: {e}", 1, error="DELETE_FAILED")
 
     # Only unregister after successful physical delete
     remove_project(project_name_resolved)

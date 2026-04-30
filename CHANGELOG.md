@@ -1,6 +1,7 @@
 # Changelog
 
-## v1.10.4 (2026-04-30)
+## v1.10.5 (2026-04-30)
+- **Fix: 优化 `project delete` 删除范围** — 现在 `mai project delete` 仅删除 `.mai` 和 `async` 目录，不再删除整个项目根目录，避免误删用户文件和 `AGENTS.md`。
 - **Fix: 修复模块导入错误** — 修正了因 `ensure_mai_structure` 移动到 `project.py` 后，`issue.py`、`issue_list.py` 和 `queue.py` 中由于延迟导入路径错误导致的 `ImportError`。
 
 ## v1.10.3 (2026-04-30)
