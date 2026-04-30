@@ -120,4 +120,4 @@ MIT License — see [LICENSE](LICENSE).
 
 ---
 
-*Mai CLI v1.10.3*
+*Mai CLI v1.10.4*

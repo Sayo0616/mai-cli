@@ -10,7 +10,8 @@ from .issue_list import list_issues_in_queue
 
 
 def cmd_queue_check(project_root: Path, queue: Optional[str], overdue: bool, show_all: bool = False, handler: Optional[str] = None):
-    from .mai import out, out_json, ensure_mai_structure, GLOBAL, suggest, err
+    from .mai import out, out_json, GLOBAL, suggest, err
+    from .project import ensure_mai_structure
     ensure_mai_structure(project_root)
     queue_sla = get_queue_sla(project_root)
     status_emoji = get_status_emoji(project_root)
@@ -83,7 +84,8 @@ def cmd_queue_check(project_root: Path, queue: Optional[str], overdue: bool, sho
 
 
 def cmd_queue_blockers(project_root: Path):
-    from .mai import out, err, out_json, ensure_mai_structure, GLOBAL
+    from .mai import out, err, out_json, GLOBAL
+    from .project import ensure_mai_structure
     ensure_mai_structure(project_root)
     
     q = get_blockers_queue(project_root)
@@ -107,7 +109,8 @@ def cmd_queue_blockers(project_root: Path):
 
 def cmd_queue_create(project_root: Path, queue_name: str, owner: str, sla_hours: Optional[float] = None):
     """REQ-013 & REQ-014: Create a new queue."""
-    from .mai import out, err, ensure_mai_structure
+    from .mai import out, err
+    from .project import ensure_mai_structure
     config = load_config(project_root)
     queues = config.get("queues", {})
     

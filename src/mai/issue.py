@@ -304,7 +304,8 @@ def _update_issue_file(project_root: Path, data: Dict[str, Any], status: str, re
 # ─────────────────────────────────────────────
 
 def cmd_issue_new(project_root: Path, queue: str, title: str, ref: Optional[str], priority: str = "P2", operator: Optional[str] = None):
-    from .mai import out, err, ensure_mai_structure, suggest
+    from .mai import out, err, suggest
+    from .project import ensure_mai_structure
     queue_sla = get_queue_sla(project_root)
     if queue not in queue_sla:
         hint = suggest(queue, list(queue_sla.keys()), "mai queue check")

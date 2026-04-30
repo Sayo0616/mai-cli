@@ -120,4 +120,4 @@ mai queue check --overdue
 
 ---
 
-*Mai CLI v1.10.3*
+*Mai CLI v1.10.4*

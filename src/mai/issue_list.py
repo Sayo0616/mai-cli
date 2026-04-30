@@ -81,7 +81,8 @@ def list_issues_in_queue(project_root: Path, queue: str,
 
 
 def cmd_issue_list(project_root: Path, queue: Optional[str], handler: Optional[str] = None):
-    from .mai import out, out_json, ensure_mai_structure, GLOBAL
+    from .mai import out, out_json, GLOBAL
+    from .project import ensure_mai_structure
     ensure_mai_structure(project_root)
     queue_sla = get_queue_sla(project_root)
 
