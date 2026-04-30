@@ -17,7 +17,7 @@
 - 📁 **Dual-layer storage** — `.mai/` as internal source, `async/` as human-readable mirror
 - ⚙️ **JSON configuration** — queue SLA, agent heartbeat, issue ID prefix all in `config.json`
 - 🔄 **Concurrent-safe daily summaries** — multiple agents write simultaneously with flock protection
-- 🌍 **Global Infrastructure** — centralized management of global config and project registry in `~/.mai-cli/` (v1.10.0+)
+- 🌍 **Global Infrastructure** — centralized management of global config and project registry in `~/.mai-cli/` (v1.10.3+)
 - ✅ **Idempotent writes** — repeating any operation preserves state
 - 📦 **Zero dependencies** — Python 3 stdlib only
 
@@ -68,11 +68,15 @@ pip install mai-cli
 ### Minimal Example
 
 ```bash
-# 1. Initialize project
-mai init
+# 0. Global setup (v1.10.3+)
+mai setup --root admin
+
+# 1. Initialize project (Root required)
+mai init -o admin
 
 # 2. Register an agent
 mai agent add alice --heartbeat-minutes 30
+```
 
 # 3. Create an issue
 mai issue new questions "Technical review" -o alice
@@ -116,4 +120,4 @@ MIT License — see [LICENSE](LICENSE).
 
 ---
 
-*Mai CLI v1.9.2*
+*Mai CLI v1.10.3*

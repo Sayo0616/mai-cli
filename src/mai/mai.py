@@ -86,7 +86,6 @@ def suggest(word: str, possibilities: List[str], command_tmpl: Optional[str] = N
     return hint
 
 
-from .project import ensure_mai_structure
 
 # ─────────────────────────────────────────────
 # Argument Parser

@@ -129,8 +129,10 @@ mai issue transfer <issue-id> <handler> -o <your-name>
 
 ## 注意事项
 
+- **全局初始化**：首次使用必须运行 `mai setup` 初始化全局配置并设置 Root。
 - 严格禁止使用他人的身份处理 issue，必须在 `-o` 参数中明确操作者身份。
 - 需要到相应项目的路径下执行命令，或者使用 `--project <path>` 指定项目路径。
+- **项目初始化**：`mai init` 强制要求 `-o <operator>` 且仅限 Root 执行。
 - 注意留痕，需要同步的信息应该追加到 issue 中，避免私下沟通导致信息不透明。
 - 定期检查自己的队列，避免 issue 长时间未处理或锁未释放。
 

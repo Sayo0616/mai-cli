@@ -37,18 +37,30 @@
 
 ---
 
-## 第一阶段:初始化共享工作区(Deployer 执行,一次)
+## 第零阶段:初始化全局环境 (Deployer 执行,一次)
+
+> 在任何 Agent 使用 `mai-cli` 功能前,必须先初始化其所在的系统全局环境。这会创建 `~/.mai-cli/` 目录并配置全局 Root 权限。
+
+```bash
+mai setup --root admin      # 设置 admin 为全局 Root (支持交互式引导)
+```
+
+> **注意**: 如果未执行此步骤,所有其他 `mai` 命令都将报错并提示运行 `setup` (v1.10.3+)。
+
+## 第一阶段:初始化共享工作区 (Deployer 执行,一次)
 
 > 选择团队共享的工作区路径。执行后共享工作区配置对所有团队成员生效。
 
 ### 步骤 1.1:初始化 mai-cli 项目
 
 ```bash
-mai init [-o <name>]         # 在当前目录初始化（可选 -o 指定操作人）
-mai project init [name] [-o <name>] # 在指定路径初始化，name 可省略（可选 -o 指定操作人）
+mai init -o <operator>         # 在当前目录初始化 (必须提供 -o,且 operator 需有 Root 权限)
+mai project init [name] -o <operator> # 在指定路径初始化 (必须提供 -o,且 operator 需有 Root 权限)
 ```
 
-> 不传参数时，`mai init` 在当前目录初始化项目（REQ-009）。**注意**：项目初始化仅限 `root` 用户执行（v1.9.2）。对于未初始化的目录，当前 OS 用户默认为 root。
+> **注意**: 
+> 1. 项目初始化现在**强制要求**使用 `-o / --operator` 参数提供操作者署名。
+> 2. 仅限 `root` 用户执行。Root 身份由第零阶段设置的全局配置或已有项目的本地配置决定。
 
 ### 步骤 1.2:注册团队成员
 
@@ -301,11 +313,16 @@ mai --project <SHARED_WORKSPACE_PATH> daily-summary read <AGENT_NAME>
 ## 附录:mai-cli 核心命令参考
 
 ```
+# Global Setup
+mai setup [--root root1,root2]
+
 # Project / Agent
-mai init [-o <name>]
-mai project init [project-name] [-o <name>]
+mai init -o <name>
+mai project init [project-name] -o <name>
+mai project delete <project-name> -o <name>
 mai agent list
 mai agent add <name> [--heartbeat-minutes 30]
+```
 
 # Issue
 mai --project <PATH> issue new <queue> <title> -o <name> [--ref <ref-id>] [--priority P0|P1|P2]

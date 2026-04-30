@@ -18,7 +18,7 @@
 - ⚙️ **JSON 配置外部化** — 队列 SLA、Agent 心跳频率全部在 `config.json`，无需改代码
 - 🔄 **并发安全每日汇总** — 多 Agent 同时写入日报，自动收集生成汇总报告
 - ✅ **幂等优先** — 所有写操作重复执行不破坏状态
-- 🌍 **全局基础设施** — `~/.mai-cli/` 统一管理全局配置与项目注册表 (v1.10.0+)
+- 🌍 **全局基础设施** — `~/.mai-cli/` 统一管理全局配置与项目注册表 (v1.10.3+)
 - 📦 **零外部依赖** — 仅 Python 3 标准库
 
 ---
@@ -68,11 +68,15 @@ pip install mai-cli
 ### 最小示例
 
 ```bash
-# 1. 初始化项目
-mai init
+# 0. 初始化全局环境 (v1.10.3+)
+mai setup --root admin
+
+# 1. 初始化项目 (需 Root 权限)
+mai init -o admin
 
 # 2. 注册 Agent
 mai agent add alice --heartbeat-minutes 30
+```
 
 # 3. 创建 Issue
 mai issue new questions "技术方案评审" -o alice
@@ -116,4 +120,4 @@ mai queue check --overdue
 
 ---
 
-*Mai CLI v1.9.2*
+*Mai CLI v1.10.3*
