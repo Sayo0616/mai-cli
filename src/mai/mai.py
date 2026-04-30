@@ -198,6 +198,10 @@ def build_parser():
     p.add_argument("issue_id")
     p.add_argument("-o", "--operator", help="Operator name (required for write actions)")
 
+    p = iss.add_parser("discard", help="Discard an issue (root/owner only)")
+    p.add_argument("issue_id"); p.add_argument("reason")
+    p.add_argument("-o", "--operator", help="Operator name (required for write actions)")
+
     # ── queue ──
     queue_sp = sub.add_parser("queue")
     q = queue_sp.add_subparsers(dest="queue_cmd", required=True)
@@ -262,6 +266,13 @@ def build_parser():
     p = pr.add_parser("init")
     p.add_argument("name", nargs="?", default=".", help="Project name or path (optional, default '.')")
     p.add_argument("-o", "--operator", help="Operator name")
+    
+    p = pr.add_parser("delete", help="Delete a project (root only)")
+    p.add_argument("name", help="Project name or path")
+    p.add_argument("-o", "--operator", help="Operator name")
+
+    p = pr.add_parser("list", help="List registered projects")
+    p.add_argument("--agent", help="Filter by agent participation")
 
     # ── agent ──
     agent_sp = sub.add_parser("agent")
@@ -282,11 +293,11 @@ def cmd_status(project_root: Path, verbose: bool = False):
     from .issue_list import list_issues_in_queue
     from .lock import check_lock
     from .daily_summary import _read_status
-    from .config import get_queue_sla
+    from .config import get_queue_sla, get_status_emoji
+    from .permission import get_all_roots
 
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    from .config import get_roots
-    roots = get_roots(project_root)
+    roots = get_all_roots(project_root)
     out(f"Project: {project_root}")
     out(f"Roots:   {', '.join(roots)}")
     out(f"Updated: {now}\n")
@@ -297,7 +308,7 @@ def cmd_status(project_root: Path, verbose: bool = False):
     status_emoji = get_status_emoji(project_root)
     for q in queue_sla:
         issues = list_issues_in_queue(project_root, q)
-        counts = {"open": 0, "in_progress": 0, "blocked": 0, "completed": 0}
+        counts = {"open": 0, "in_progress": 0, "blocked": 0, "completed": 0, "discarded": 0}
         for iss in issues:
             st = iss.get("status", "open").lower()
             if st in counts:
@@ -305,7 +316,7 @@ def cmd_status(project_root: Path, verbose: bool = False):
             else:
                 counts["open"] += 1
 
-        out(f"  {q:15} OPEN: {counts['open']:<3} IN_PROGRESS: {counts['in_progress']:<3} BLOCKED: {counts['blocked']:<3}")
+        out(f"  {q:15} OPEN: {counts['open']:<3} IN_PROGRESS: {counts['in_progress']:<3} BLOCKED: {counts['blocked']:<3} DISCARDED: {counts['discarded']:<3}")
         if verbose and issues:
             for iss in issues:
                 st_icon = status_emoji.get(iss.get("status", "open").lower(), "❓")
@@ -371,7 +382,7 @@ def dispatch(args) -> None:
         cmd_status(project_root, getattr(args, "verbose", False))
         return
 
-    if args.subcommand not in ["project", "init"] or (args.subcommand == "project" and args.proj_cmd != "init"):
+    if args.subcommand not in ["project", "init"] or (args.subcommand == "project" and args.proj_cmd not in ["init", "list", "delete"]):
         project_root = find_project_root(args.project)
         if project_root is None:
             err("Project not found. Run 'mai init'.",
@@ -398,13 +409,15 @@ def dispatch(args) -> None:
         elif args.subcommand == "exec":
             dispatch_exec(args, project_root)
         elif args.subcommand == "project":
-            if args.proj_cmd == "init":
-                cmd_project_init(args.name, operator=getattr(args, "operator", None))
+            dispatch_project(args)
         elif args.subcommand == "init":
-            cmd_project_init(Path.cwd(), operator=getattr(args, "operator", None))
+            from .project import cmd_project_init
+            cmd_project_init(".", operator=getattr(args, "operator", None))
         elif args.subcommand == "agent":
             dispatch_agent(args, project_root)
     except Exception as e:
+        if GLOBAL.dry_run:
+            raise
         err(str(e), 1, error="INTERNAL_ERROR")
 
 
@@ -431,6 +444,7 @@ def dispatch_issue(args, project_root: Path) -> None:
         cmd_issue_reopen, cmd_issue_status,
         cmd_issue_transfer,
         cmd_issue_confirm, cmd_issue_reject,
+        cmd_issue_discard,
     )
     from .issue_list import cmd_issue_list, cmd_issue_show
     if args.issue_cmd == "new":
@@ -475,6 +489,40 @@ def dispatch_issue(args, project_root: Path) -> None:
         from .issue import cmd_issue_escalate
         op = get_operator(args)
         cmd_issue_escalate(project_root, args.issue_id, operator=op)
+    elif args.issue_cmd == "discard":
+        op = get_operator(args)
+        cmd_issue_discard(project_root, args.issue_id, args.reason, operator=op)
+
+
+def dispatch_project(args) -> None:
+    from .project import cmd_project_init, cmd_project_delete
+    if args.proj_cmd == "init":
+        cmd_project_init(args.name, operator=getattr(args, "operator", None))
+    elif args.proj_cmd == "delete":
+        op = get_operator(args)
+        cmd_project_delete(args.name, operator=op)
+    elif args.proj_cmd == "list":
+        cmd_project_list(agent=args.agent)
+
+
+def cmd_project_list(agent: Optional[str] = None):
+    """List registered projects."""
+    from .project_registry import list_projects, list_projects_by_agent
+    if agent:
+        projects = list_projects_by_agent(agent)
+        out(f"Projects involving agent '{agent}':")
+    else:
+        projects = list_projects()
+        out("Registered Mai Projects:")
+    
+    if not projects:
+        out("  (None)")
+        return
+        
+    for p in projects:
+        out(f"  - {p['name']:15} path: {p['path']}")
+        out(f"    description: {p.get('description', '')}")
+        out(f"    agents:      {', '.join(p.get('agents', []))}")
 
 
 def dispatch_queue(args, project_root: Path) -> None:
