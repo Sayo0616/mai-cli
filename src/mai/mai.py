@@ -86,32 +86,7 @@ def suggest(word: str, possibilities: List[str], command_tmpl: Optional[str] = N
     return hint
 
 
-# ─────────────────────────────────────────────
-# Project Structure Helper
-# ─────────────────────────────────────────────
-
-def ensure_mai_structure(project_root: Path):
-    """Create all required .mai/ and async/ subdirectories."""
-    if GLOBAL.dry_run:
-        return
-    from .config import get_queue_sla
-    mai = get_mai_dir(project_root)
-    (mai / "queues").mkdir(parents=True, exist_ok=True)
-    (mai / "processing").mkdir(parents=True, exist_ok=True)
-    (mai / "locks").mkdir(parents=True, exist_ok=True)
-    (mai / "decisions").mkdir(parents=True, exist_ok=True)
-    (mai / "history").mkdir(parents=True, exist_ok=True)
-    (mai / "events").mkdir(parents=True, exist_ok=True)
-    (mai / "daily-summary").mkdir(parents=True, exist_ok=True)
-    
-    async_dir = get_async_dir(project_root)
-    async_dir.mkdir(parents=True, exist_ok=True)
-
-    # Create subdirs for each queue
-    queue_sla = get_queue_sla(project_root)
-    for q in queue_sla:
-        (mai / "queues" / q).mkdir(parents=True, exist_ok=True)
-        (async_dir / q).mkdir(parents=True, exist_ok=True)
+from .project import ensure_mai_structure
 
 # ─────────────────────────────────────────────
 # Argument Parser
