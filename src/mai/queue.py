@@ -31,9 +31,9 @@ def cmd_queue_check(project_root: Path, queue: Optional[str], overdue: bool, sho
     for q in queues:
         issues = list_issues_in_queue(project_root, q, overdue_only=overdue)
         
-        # REQ-2: Hide COMPLETED by default
+        # REQ-2: Hide COMPLETED/DISCARDED by default
         if not show_all:
-            issues = [iss for iss in issues if iss["status"].upper() not in ("COMPLETED", "DONE")]
+            issues = [iss for iss in issues if iss["status"].upper() not in ("COMPLETED", "DONE", "DISCARDED")]
         
         # REQ-4: Filter by handler
         if handler:
@@ -75,12 +75,12 @@ def cmd_queue_check(project_root: Path, queue: Optional[str], overdue: bool, sho
             for iss in data["issues"]:
                 emoji = status_emoji.get(iss["status"].lower(), "")
                 if handler:
-                    # [ID] emoji STATUS Title (owner: NAME, created: ...)
+                    # [ID] emoji STATUS Title (handler: NAME, created: ...)
                     out(f"[{iss['id']}] {emoji} {iss['status']} {iss['title']} "
-                        f"(owner: {iss['owner']}, created: {iss['created']})")
+                        f"(handler: {iss['owner']}, created: {iss['created']})")
                 else:
                     out(f"  [{iss['id']}] {emoji} {iss['title']} "
-                        f"(owner: {iss['owner']}, created: {iss['created']})")
+                        f"(handler: {iss['owner']}, created: {iss['created']})")
 
 
 def cmd_queue_blockers(project_root: Path):

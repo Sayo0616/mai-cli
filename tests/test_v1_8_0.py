@@ -98,8 +98,7 @@ def test_queue_check_handler_formatting(capsys, monkeypatch):
         out, _ = capsys.readouterr()
         assert "## Queue: questions" not in out
         assert "[REQ-" in out
-        assert "(owner: alice, created:" in out
-
+        assert "(handler: alice, created:" in out
 def test_handler_matching_with_at_prefix(capsys):
     from mai.issue import cmd_issue_new
     from mai.queue import cmd_queue_check
