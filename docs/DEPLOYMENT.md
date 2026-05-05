@@ -15,8 +15,8 @@
 |---|---|
 | **共享工作区** | 团队成员共享的 mai-cli 项目目录,存放所有 issue/lock/daily-summary 数据。位于各 Agent 都能访问的共享路径下。 |
 | **团队成员** | 参与协作的 Agent,按角色划分,每个角色对应一个 handler。 |
-| **Handler** | Issue 的当前处理人（即认领该 Issue 的人）。获得 Issue 的排他性写锁。 |
-| **Owner** | 队列负责人。负责 Issue 的生命周期管理（创建、结项验收、转交等）。v1.9.0 中已与 Creator 合并。 |
+| **Handler** | Issue 的当前处理人（即认领该 Issue 的人）。获得 Issue 的排他性写锁。在 `mai queue check` 输出中标识为 `handler`。 |
+| **Owner** | 队列负责人。负责 Issue 的生命周期管理（创建、结项验收、拒绝、废弃等）。通常是审验者。 |
 | **Root** | 超级管理员。拥有全权限，可执行所有队列的管理操作。在 `config.json` 中配置。 |
 | **Deployer** | 负责初始化的 Agent,执行第一至二阶段。任意 Agent 均可,可以不是团队成员。 |
 | **平台** | Agent 的运行时环境(如 `openclaw`、`hermes`)。不同平台的心跳/cron/exec 机制不同,部署时分开处理。 |
@@ -350,7 +350,7 @@ mai --project <PATH> issue status <issue-id>
 mai --project <PATH> issue amend <issue-id> <remark> -o <name>
 mai --project <PATH> issue list [queue]
 mai --project <PATH> issue show <issue-id>
-mai --project <PATH> issue transfer <issue-id> <next-handler> -o <name>
+mai --project <PATH> issue transfer <issue-id> <next-handler> "<message>" -o <name>
 mai --project <PATH> issue confirm <issue-id> -o <name>
 mai --project <PATH> issue reject <issue-id> <reason> -o <name>
 mai --project <PATH> issue escalate <issue-id> -o <name>

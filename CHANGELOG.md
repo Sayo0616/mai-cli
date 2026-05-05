@@ -1,5 +1,10 @@
 # Changelog
 
+## v1.11.2 (2026-05-05)
+- **Terminology: 修正 Owner 与 Handler 定义** — 明确了 Owner（审验者/所有人）与 Handler（当前处理人）的区别。修正了 `mai queue check` 的输出，将显示处理人的标签从 `owner` 更改为 `handler`。
+- **Fix: 优化 `queue check` 过滤逻辑** — `mai queue check` 指令现在默认不再显示状态为 `DISCARDED`（已废弃）的工单，保持视图简洁。
+- **UX: 强制 Transfer 备注** — `mai issue transfer` 现在强制要求提供转交信息（message），支持命令行参数或标准输入，确保接手人有足够的上下文。
+
 ## v1.11.1 (2026-05-02)
 - **Feature: 支持从标准输入 (Stdin) 读取备注** — 解决了在使用 Heredoc（如 `<< 'EOF'`) 时无法将内容追加进工单的问题。现在 `issue amend`, `block`, `complete`, `reopen`, `reject`, `discard` 以及 `log write` 和 `daily-summary write` 等指令在缺失位置参数时，会自动尝试从 stdin 读取内容。
 - **UX: 优化指令交互** — 将上述指令的描述性参数（remark, reason, conclusion 等）设为可选，配合 stdin 支持，使自动化脚本和长文档提交更加便捷。

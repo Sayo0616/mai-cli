@@ -24,7 +24,7 @@
 | `issue amend <issue-id> <remark> -o <name> / --operator <name>` | 补充说明或备注 |
 | `issue list [queue] [--handler <name>]` | 列出 Issue（支持按处理人过滤） |
 | `issue show <issue-id>` | 查看 issue 详情 |
-| `issue transfer <issue-id> <next-handler> -o <name> / --operator <name>` | 转交 Issue 给下一位处理人（自动释放锁；**注意**：仅变更处理人，队列不变） |
+| `issue transfer <issue-id> <next-handler> <message> -o <name>` | 转交 Issue（自动释放锁；**必须**提供转交信息） |
 | `issue confirm <issue-id> -o <name> / --operator <name>` | [Alias to complete] 确认 Issue 完成，状态 → COMPLETED |
 | `issue reject <issue-id> <reason> -o <name> / --operator <name>` | 拒绝 Issue 结论，状态恢复为 OPEN |
 | `issue escalate <issue-id> -o <name> / --operator <name>` | 将 issue 升级到上级处理 |
@@ -34,7 +34,7 @@
 
 | 命令 | 说明 |
 |------|------|
-| `queue check [queue] [--overdue] [--all] [--handler <name>]` | 检查队列状态。默认隐藏已完成。`--all` 显示全部，`--overdue` 只显示超时，`--handler` 按处理人过滤 |
+| `queue check [queue] [--overdue] [--all] [--handler <name>]` | 检查队列状态。默认隐藏已完成/已废弃。`--all` 显示全部，`--overdue` 只显示超时，`--handler` 按处理人过滤 |
 | `queue blockers` | 显示当前阻塞队列的 issue |
 | `queue create <queue> --owner <agent> [--sla <hours>]` | 创建新队列 |
 

@@ -61,7 +61,7 @@ mai issue amend <issue-id> <remark> -o <your-name>
 
 **认领后**：状态变为 **IN_PROGRESS**，你成为当前 Handler。
 
-> 处理完成后，**必须** 先追加完成信息（包括产出的文档地址），然后用 `issue transfer` 转给下一处理人或返回发起者审验。不得长时间持有锁。
+> 处理完成后，**必须** 先追加完成信息（包括产出的文档地址），然后用 `issue transfer` 转给下一处理人（**必须带备注信息**）或返回发起者审验。不得长时间持有锁。
 
 ## 3. 转 Issue
 
@@ -70,7 +70,7 @@ mai issue amend <issue-id> <remark> -o <your-name>
 
 ```bash
 # 转给下一位处理人（自动释放锁）
-mai issue transfer <issue-id> <next-handler> -o <your-name>
+mai issue transfer <issue-id> <next-handler> "<message>" -o <your-name>
 ```
 
 **注意**：
@@ -94,7 +94,7 @@ mai issue confirm <issue-id> -o <your-name>
 **审验未通过**：转回对应处理人重新处理
 
 ```bash
-mai issue transfer <issue-id> <handler> -o <your-name>
+mai issue transfer <issue-id> <handler> "<message>" -o <your-name>
 ```
 
 > `complete` / `confirm` 会将状态置为 **COMPLETED**，自动释放锁。
@@ -108,7 +108,7 @@ mai issue transfer <issue-id> <handler> -o <your-name>
 | 认领 issue | `mai issue claim <issue-id> -o <name>` |
 | 查看详情 | `mai issue show <issue-id>` |
 | 追加处理记录 | `mai issue amend <issue-id> <remark> -o <name>` |
-| 转交处理人 | `mai issue transfer <issue-id> <next-handler> -o <name>` |
+| 转交处理人 | `mai issue transfer <issue-id> <next-handler> "<message>" -o <name>` |
 | 确认完成 | `mai issue complete <issue-id> <conclusion> -o <name>` |
 | 拒绝（重新处理） | `mai issue reject <issue-id> <reason> -o <name>` |
 
