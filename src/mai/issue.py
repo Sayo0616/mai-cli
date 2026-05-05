@@ -634,7 +634,7 @@ def _check_lock_for_action(project_root: Path, issue_id: str, agent: str) -> Non
         err(f"Issue {issue_id} is locked by {li['holder']}. Action denied.", 2, error="LOCK_HELD")
 
 
-def cmd_issue_transfer(project_root: Path, issue_id: str, next_handler: str, operator: Optional[str] = None) -> None:
+def cmd_issue_transfer(project_root: Path, issue_id: str, next_handler: str, message: str, operator: Optional[str] = None) -> None:
     from .mai import out, err
     agent = operator or os.environ.get("MAI_AGENT", os.environ.get("AGENT_NAME", "unknown"))
     issue = read_issue(project_root, issue_id)
@@ -652,7 +652,7 @@ def cmd_issue_transfer(project_root: Path, issue_id: str, next_handler: str, ope
 
     if not GLOBAL.dry_run:
         release_lock(project_root, issue_id)
-        _update_issue_file(project_root, issue, "OPEN", remark=f"转交给 @{next_handler}", new_owner=next_handler, operator=agent)
+        _update_issue_file(project_root, issue, "OPEN", remark=f"转交给 @{next_handler}：{message}", new_owner=next_handler, operator=agent)
 
     out(f"Issue {issue_id} transferred to {next_handler}.", command="issue transfer", issue_id=issue_id, next_handler=next_handler)
 

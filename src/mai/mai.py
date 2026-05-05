@@ -156,7 +156,7 @@ def build_parser():
     p.add_argument("--handler", help="Filter by handler (owner)")
 
     p = iss.add_parser("transfer", help="Transfer issue to another handler")
-    p.add_argument("issue_id"); p.add_argument("next_handler")
+    p.add_argument("issue_id"); p.add_argument("next_handler"); p.add_argument("message", nargs="?", default="")
     p.add_argument("-o", "--operator", help="Operator name (required for write actions)")
 
     # Deprecated/Removed
@@ -499,7 +499,10 @@ def dispatch_issue(args, project_root: Path) -> None:
         cmd_issue_list(project_root, args.queue, getattr(args, "handler", None))
     elif args.issue_cmd == "transfer":
         op = get_operator(args)
-        cmd_issue_transfer(project_root, args.issue_id, args.next_handler, operator=op)
+        message = read_stdin_if_needed(args.message)
+        if not message:
+            err("Message is required for transfer.", 1, error="MESSAGE_REQUIRED")
+        cmd_issue_transfer(project_root, args.issue_id, args.next_handler, message, operator=op)
     elif args.issue_cmd == "submit-to-creator":
         err("Command 'submit-to-creator' is removed. Please use 'transfer <issue-id> <next-handler>' instead.", 1)
     elif args.issue_cmd == "confirm":
