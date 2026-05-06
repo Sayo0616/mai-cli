@@ -164,7 +164,6 @@ def save_config(project_root: Path, config: Dict[str, Any]):
         return
     cfg_file = get_mai_dir(project_root) / "config.json"
     cfg_file.write_text(json.dumps(config, indent=2, ensure_ascii=False))
-    # Sync is handled by caller
 
 
 def find_project_root(project_name: Optional[str] = None) -> Optional[Path]:
@@ -199,7 +198,3 @@ def find_project_root(project_name: Optional[str] = None) -> Optional[Path]:
 
 def get_mai_dir(project_root: Path) -> Path:
     return project_root / ".mai"
-
-
-def get_async_dir(project_root: Path) -> Path:
-    return project_root / "async"

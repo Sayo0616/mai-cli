@@ -12,7 +12,6 @@ from typing import Dict, Any, List, Optional
 from .config import (
     get_mai_dir, get_daily_order, GLOBAL,
 )
-from .sync import sync_to_async
 
 
 # ─────────────────────────────────────────────
@@ -63,7 +62,6 @@ def _write_status(project_root: Path, data: Dict[str, Any]):
     stat_file = _status_file_path(project_root)
     stat_file.parent.mkdir(parents=True, exist_ok=True)
     stat_file.write_text(json.dumps(data, ensure_ascii=False, indent=2))
-    sync_to_async(stat_file, project_root)
 
 
 # ─────────────────────────────────────────────
@@ -176,7 +174,6 @@ def daily_summary_write(project_root: Path, agent: str, content: Any):
                     f"# {agent.title()} Daily Summary - {today}\n\n{content}\n",
                     encoding="utf-8"
                 )
-                sync_to_async(summary_file, project_root)
 
                 agent_status[agent] = "written"
                 status["status"] = agent_status
@@ -253,7 +250,6 @@ def daily_summary_collect(project_root: Path) -> DailySummaryResult:
             lines.append(content if content else "（无摘要）")
         report_text = "\n".join(lines)
         report_file.write_text(report_text, encoding="utf-8")
-        sync_to_async(report_file, project_root)
 
     if GLOBAL.format == "json":
         out_json({"ok": True, "command": "daily-summary read --all",

@@ -10,9 +10,8 @@ from pathlib import Path
 from typing import Optional, Dict, Any
 
 from .config import (
-    get_mai_dir, get_async_dir, get_heartbeat_intervals, GLOBAL,
+    get_mai_dir, get_heartbeat_intervals, GLOBAL,
 )
-from .sync import sync_to_async
 
 
 def lock_path(project_root: Path, issue_id: str) -> Path:
@@ -72,7 +71,6 @@ def acquire_lock(project_root: Path, issue_id: str, agent: str) -> bool:
         proc_file.write_text(
             f"# Processing\n\nIssue: {issue_id}\nAgent: {agent}\nStarted: {ts}\n"
         )
-        sync_to_async(proc_file, project_root)
 
     return True
 

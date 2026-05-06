@@ -8,7 +8,6 @@ from pathlib import Path
 from typing import Optional, List
 
 from .config import get_mai_dir, GLOBAL
-from .sync import sync_to_async
 
 
 def write_history(project_root: Path, agent: str, event_type: str,
@@ -32,7 +31,6 @@ def write_history(project_root: Path, agent: str, event_type: str,
     
     with open(hist_file, "a") as f:
         f.write(entry)
-    sync_to_async(hist_file, project_root)
 
 
 def read_history(project_root: Path,
@@ -106,5 +104,4 @@ def cmd_log_undo(project_root: Path):
         # Fallback: manually remove last line
         hist_file.write_text("\n".join(lines[:-1]) + ("\n" if len(lines) > 1 else ""), encoding="utf-8")
     
-    sync_to_async(hist_file, project_root)
     out(f"✅ Undone last log entry: {last_line}", command="log undo")

@@ -9,17 +9,16 @@ from pathlib import Path
 from typing import Optional
 
 from .config import (
-    find_project_root, get_mai_dir, get_async_dir,
+    find_project_root, get_mai_dir,
     get_queue_sla, load_config, save_config, GLOBAL,
     DEFAULT_QUEUES, DEFAULT_AGENTS, DEFAULT_DAILY_ORDER, DEFAULT_EMOJI,
 )
-from .sync import sync_to_async
 from .permission import check_project_permission
 from .project_registry import add_project, remove_project
 
 
 def ensure_mai_structure(project_root: Path):
-    """Create all required .mai/ and async/ subdirectories."""
+    """Create all required .mai/ subdirectories."""
     if GLOBAL.dry_run:
         return
     mai = get_mai_dir(project_root)
@@ -31,13 +30,9 @@ def ensure_mai_structure(project_root: Path):
     (mai / "events").mkdir(parents=True, exist_ok=True)
     (mai / "daily-summary").mkdir(parents=True, exist_ok=True)
 
-    async_dir = get_async_dir(project_root)
-    async_dir.mkdir(parents=True, exist_ok=True)
-
     queue_sla = get_queue_sla(project_root)
     for q in queue_sla:
         (mai / "queues" / q).mkdir(parents=True, exist_ok=True)
-        (async_dir / q).mkdir(parents=True, exist_ok=True)
 
 
 def cmd_project_init(project_name: str, operator: str = None):
@@ -92,7 +87,6 @@ def cmd_project_init(project_name: str, operator: str = None):
     new_config["root"] = new_config.get("root", [])
 
     save_config(project_root, new_config)
-    sync_to_async(cfg_file, project_root)
 
     # 5. Register in Global Registry
     add_project(
@@ -138,12 +132,9 @@ def cmd_project_delete(project_name: str, operator: str = None):
     project_name_resolved = project_root.name
     try:
         mai_dir = get_mai_dir(project_root)
-        async_dir = get_async_dir(project_root)
         
         if mai_dir.exists():
             shutil.rmtree(mai_dir)
-        if async_dir.exists():
-            shutil.rmtree(async_dir)
     except Exception as e:
         err(f"Failed to delete project metadata: {e}", 1, error="DELETE_FAILED")
 

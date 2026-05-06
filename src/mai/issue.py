@@ -11,9 +11,8 @@ from typing import Optional, List, Dict, Any
 
 from .config import (
     get_queue_sla, get_queue_id_prefix, get_status_emoji,
-    get_mai_dir, get_async_dir, GLOBAL,
+    get_mai_dir, GLOBAL,
 )
-from .sync import sync_to_async
 from .lock import acquire_lock, release_lock, check_lock
 from .log import write_history
 from .permission import check_permission, check_project_permission
@@ -339,7 +338,6 @@ def _update_issue_file(project_root: Path, data: Dict[str, Any], status: str, re
             operator=agent
         )
         fpath.write_text(new_content, encoding="utf-8")
-        sync_to_async(fpath, project_root)
         write_history(project_root, agent, f"issue_{status.lower()}",
                     f"Issue {data['id']} status changed to {status} (migrated to v2)", status.lower())
         return
@@ -366,7 +364,6 @@ def _update_issue_file(project_root: Path, data: Dict[str, Any], status: str, re
     content = re.sub(r"(</mai_timeline>)", f"{new_action}\n\\1", content)
 
     fpath.write_text(content, encoding="utf-8")
-    sync_to_async(fpath, project_root)
     write_history(project_root, agent, f"issue_{status.lower()}",
                   f"Issue {data['id']} status changed to {status}", status.lower())
 
@@ -416,7 +413,6 @@ def cmd_issue_new(project_root: Path, queue: str, title: str, ref: Optional[str]
 
     fpath = issue_file_path(project_root, queue, issue_id)
     fpath.write_text(content, encoding="utf-8")
-    sync_to_async(fpath, project_root)
     write_history(project_root, agent, "issue_new",
                   f"Issue {issue_id} created in {queue}: {title}", "open")
 
@@ -520,7 +516,6 @@ def cmd_issue_complete(project_root: Path, issue_id: str, conclusion: str, opera
             dec_file.write_text(dec_file.read_text("utf-8") + complete_entry)
         else:
             dec_file.write_text(f"# 结论 - Issue {issue_id}\n{complete_entry}")
-        sync_to_async(dec_file, project_root)
 
         _update_issue_file(project_root, issue, "COMPLETED", remark=conclusion or "已确认完成", operator=agent)
 
@@ -619,7 +614,6 @@ def cmd_issue_escalate(project_root: Path, issue_id: str, operator: Optional[str
     if not GLOBAL.dry_run:
         fpath = issue_file_path(project_root, queue, new_id)
         fpath.write_text(content, encoding="utf-8")
-        sync_to_async(fpath, project_root)
         write_history(project_root, agent, "issue_escalate",
                       f"Issue {issue_id} escalated → {new_id} in {queue}", "escalated")
 
