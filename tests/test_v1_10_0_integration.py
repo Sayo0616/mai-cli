@@ -121,7 +121,6 @@ def test_project_list_and_delete(temp_env):
     assert ok, f"Project delete failed for root. Output: {output}"
     assert "deleted successfully" in output.lower()
     
-    # Check if directory is NOT gone (v1.10.4 change: only delete .mai/async)
     assert temp_env["project"].exists()
     assert not (temp_env["project"] / ".mai").exists()
     

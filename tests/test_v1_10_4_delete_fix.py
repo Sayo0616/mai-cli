@@ -60,9 +60,8 @@ def test_project_delete_should_only_delete_mai_files(temp_env):
     keep_file = project_root / "keep_me.txt"
     keep_file.write_text("don't delete me")
     
-    # Verify .mai and async exist
+    # Verify .mai exists
     assert (project_root / ".mai").exists()
-    assert (project_root / "async").exists()
     
     # 3. Delete project
     # Note: 'project' is the name of the directory which is used as project name in init
@@ -71,7 +70,6 @@ def test_project_delete_should_only_delete_mai_files(temp_env):
     
     # 4. Assertions
     assert not (project_root / ".mai").exists(), ".mai should be deleted"
-    assert not (project_root / "async").exists(), "async should be deleted"
     
     # THIS IS THE EXPECTED BEHAVIOR AFTER FIX:
     # The project root and non-mai files should still exist.

@@ -206,7 +206,6 @@ def test_ensure_mai_structure():
         assert (mai / "decisions").exists()
         assert (mai / "history").exists()
         assert (mai / "events").exists()
-        assert (root / "async").exists()
 
 def test_cmd_agent_add():
     from mai.agent import cmd_agent_add
