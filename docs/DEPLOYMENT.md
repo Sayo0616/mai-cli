@@ -13,7 +13,7 @@
 
 | 概念 | 说明 |
 |---|---|
-| **共享工作区** | 团队成员共享的 mai-cli 项目目录,存放所有 issue/lock/daily-summary 数据。位于各 Agent 都能访问的共享路径下。 |
+| **共享工作区** | 团队成员共享的 mai-cli 项目目录,存放所有 issue/lock/daily-summary 数据。位于各 Agent 都能访问的共享路径下，所有元数据均存储在 `.mai/` 文件夹中。 |
 | **团队成员** | 参与协作的 Agent,按角色划分,每个角色对应一个 handler。 |
 | **Handler** | Issue 的当前处理人（即认领该 Issue 的人）。获得 Issue 的排他性写锁。在 `mai queue check` 输出中标识为 `handler`。 |
 | **Owner** | 队列负责人。负责 Issue 的生命周期管理（创建、结项验收、拒绝、废弃等）。通常是审验者。 |
@@ -61,6 +61,7 @@ mai project init [name] -o <operator> # 在指定路径初始化 (必须提供 -
 > **注意**: 
 > 1. 项目初始化现在**强制要求**使用 `-o / --operator` 参数提供操作者署名。
 > 2. 仅限 `root` 用户执行。Root 身份由第零阶段设置的全局配置或已有项目的本地配置决定。
+> 3. `mai project delete` 仅删除 `.mai` 目录（v1.12.0+）。
 
 ### 步骤 1.2:注册团队成员
 

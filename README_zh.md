@@ -14,7 +14,7 @@
 
 - 🔒 **flock 原子锁** — POSIX `fcntl.flock()` 实现，并发写入安全，进程崩溃自动释放
 - 📋 **标准化命令** — 覆盖 Issue 生命周期、队列扫描、锁管理、审计日志、每日汇总
-- 📁 **双层存储结构** — `.mai/` 作为内部数据源，`async/` 作为人类可视化镜像
+- 📁 **文件化存储** — 所有元数据均存储在 `.mai/` 目录下
 - ⚙️ **JSON 配置外部化** — 队列 SLA、Agent 心跳频率全部在 `config.json`，无需改代码
 - 🔄 **并发安全每日汇总** — 多 Agent 同时写入日报，自动收集生成汇总报告
 - ✅ **幂等优先** — 所有写操作重复执行不破坏状态
@@ -28,8 +28,7 @@
 ```mermaid
 flowchart TB
     subgraph 存储层
-        A[".mai/ — 内部数据源"]
-        B["async/ — 人类可视化镜像"]
+        A[".mai/ — 元数据存储"]
     end
     subgraph 核心机制
         C["Issue 队列"]
@@ -47,7 +46,6 @@ flowchart TB
     H --> D
     I --> C
     C --> A
-    A --> B
 ```
 
 ---
@@ -119,4 +117,4 @@ mai queue check --overdue
 
 ---
 
-*Mai CLI v1.10.6*
+*Mai CLI v1.12.0*

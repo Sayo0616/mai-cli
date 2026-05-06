@@ -14,7 +14,7 @@
 
 - 🔒 **Atomic flock locks** — race-condition-free claim/complete via POSIX `fcntl.flock()`
 - 📋 **Standardized commands** — full Issue lifecycle, queue scanning, lock management, audit logs, daily summaries
-- 📁 **Dual-layer storage** — `.mai/` as internal source, `async/` as human-readable mirror
+- 📁 **File-based storage** — all metadata stored in `.mai/` directory
 - ⚙️ **JSON configuration** — queue SLA, agent heartbeat, issue ID prefix all in `config.json`
 - 🔄 **Concurrent-safe daily summaries** — multiple agents write simultaneously with flock protection
 - 🌍 **Global Infrastructure** — centralized management of global config and project registry in `~/.mai-cli/` (v1.10.3+)
@@ -28,8 +28,7 @@
 ```mermaid
 flowchart TB
     subgraph Storage
-        A[".mai/ — internal source"]
-        B["async/ — human-readable mirror"]
+        A[".mai/ — Metadata storage"]
     end
     subgraph Core
         C["Issue Queue"]
@@ -47,7 +46,6 @@ flowchart TB
     H --> D
     I --> C
     C --> A
-    A --> B
 ```
 
 ---
@@ -120,4 +118,4 @@ MIT License — see [LICENSE](LICENSE).
 
 ---
 
-*Mai CLI v1.10.6*
+*Mai CLI v1.12.0*

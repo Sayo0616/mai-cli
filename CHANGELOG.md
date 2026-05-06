@@ -1,5 +1,11 @@
 # Changelog
 
+## v1.12.0 (2026-05-06)
+- **Architecture: 移除 Async 镜像目录** — 彻底废弃了原用于维护 `.mai/` 内部文件可读镜像的 `async/` 文件夹及其同步机制。
+- **Refactor: 存储结构精简** — 移除了 `sync.py` 核心模块及所有业务代码中的 `sync_to_async` 调用。现在所有元数据仅保存在 `.mai/` 目录中，减少了冗余写入和磁盘占用。
+- **UX: 项目初始化与清理逻辑优化** — `mai init` 不再创建 `async/` 目录，`mai project delete` 也不再尝试清理该目录，保持项目根目录整洁。
+- **Docs: 架构文档同步更新** — 全面更新了 README 和 架构图，反映新的单层存储模型。
+
 ## v1.11.2 (2026-05-05)
 - **Terminology: 修正 Owner 与 Handler 定义** — 明确了 Owner（审验者/所有人）与 Handler（当前处理人）的区别。修正了 `mai queue check` 的输出，将显示处理人的标签从 `owner` 更改为 `handler`。
 - **Fix: 优化 `queue check` 过滤逻辑** — `mai queue check` 指令现在默认不再显示状态为 `DISCARDED`（已废弃）的工单，保持视图简洁。
